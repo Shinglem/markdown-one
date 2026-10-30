@@ -23,7 +23,9 @@ public class GfmMarkdownParser : MarkdownParser {
     private val parser = JetBrainsMarkdownParser(flavour)
 
     override fun parse(source: String, streaming: Boolean): MdDocument {
-        val text = if (streaming) balanceCodeFences(source) else source
+        val balanced = if (streaming) balanceCodeFences(source) else source
+        // 内联 HTML → Markdown 标记：必须在解析前做，见 HtmlNormalizer 的说明。
+        val text = normalizeInlineHtml(balanced)
         val tree = runCatching { parser.buildMarkdownTreeFromString(text as CharSequence) }.getOrNull()
             ?: return MdDocument(emptyList(), streaming)
 

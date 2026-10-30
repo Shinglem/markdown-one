@@ -6,6 +6,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import com.mikepenz.markdown.model.MarkdownAnnotator
 import com.mikepenz.markdown.model.markdownAnnotator
+import com.mikepenz.markdown.utils.getUnescapedTextInNode
+import org.intellij.markdown.MarkdownTokenTypes
 
 /** 行内内容片段：普通文本，或一段 TeX 公式。 */
 internal sealed interface MathPart {
@@ -78,34 +80,31 @@ internal fun collectInlineTexes(markdown: String): Set<String> =
 internal expect fun mathInlineContents(texes: Set<String>): Map<String, InlineTextContent>
 
 /**
- * 在默认 annotator 外面包一层：把文本节点里的 `$…$` 换成 inline content。
+ * 在默认 annotator 上拦截「含 `$…$` 的文本叶子节点」：切成文本段与公式段，公式段换成 inline content。
  *
- * 为什么要包而不是重写：默认 annotator 负责粗体/斜体/行内代码/链接的样式，
- * 重写会全部丢掉。这里只把「含 `$` 的文本节点」切成多段，逐段交给默认实现，
- * 公式段替换成 inline content —— 样式行为与原来一致。
+ * 几条必须遵守的契约（看 mikepenz 的 `buildMarkdownAnnotatedString` 实现）：
+ * - annotate 是**逐个子节点**调用的，`content` 永远是整段文本，节点位置靠 `node` 的 offset；
+ * - 返回 `true` 表示「这个节点我处理完了」，mikepenz 会**跳过它的全部内置逻辑**；
+ * - 返回 `false` 才会走内置逻辑（含 `pushStyle` + 递归子节点）。
+ *
+ * 因此只在「TEXT 叶子节点且真的含公式」时返回 `true`；其它情况一律交给内置逻辑 ——
+ * 粗体/斜体/行内代码/链接的样式都靠外层节点递归时 `pushStyle` 兜住，在叶子上 `append`
+ * 纯文本不会丢样式。
  */
 internal fun mathAnnotator(base: MarkdownAnnotator): MarkdownAnnotator =
-    markdownAnnotator(config = base.config) { content, node ->
-        if (!content.contains('$')) {
-            base.annotate?.invoke(this, content, node) ?: true
-        } else {
-            var handled = false
-            splitInlineMath(content).forEach { part ->
-                when (part) {
-                    is MathPart.Text -> {
-                        if (part.text.isNotEmpty()) {
-                            handled = (base.annotate?.invoke(this, part.text, node) ?: true) || handled
-                        }
-                    }
-
-                    is MathPart.TeX -> {
-                        appendInlineContent(MATH_KEY_PREFIX + part.tex, part.tex)
-                        handled = true
-                    }
-                }
+    markdownAnnotator(config = base.config) math@{ content, node ->
+        if (node.type != MarkdownTokenTypes.TEXT) return@math false
+        val text = node.getUnescapedTextInNode(content)
+        if (!text.contains('$')) return@math false
+        val parts = splitInlineMath(text)
+        if (parts.none { it is MathPart.TeX }) return@math false
+        parts.forEach { part ->
+            when (part) {
+                is MathPart.Text -> append(part.text)
+                is MathPart.TeX -> appendInlineContent(MATH_KEY_PREFIX + part.tex, part.tex)
             }
-            handled
         }
+        true
     }
 
 /** 组合期间缓存：annotator 与 inline content 都与文档内容绑定。 */
