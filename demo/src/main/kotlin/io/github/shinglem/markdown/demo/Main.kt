@@ -183,6 +183,8 @@ fun main() = application {
 private fun DemoScreen() {
     val selected = remember { mutableStateOf(FIXTURES.first()) }
     val routes = remember { mutableStateMapOf<String, String>() }
+    // 按 fixture 名分组：切 fixture 时不清空面板，靠前缀区分，避免「清了却不重填」。
+    val currentName = remember { mutableStateOf(FIXTURES.first().name) }
 
     val config = remember {
         MarkdownConfig(
@@ -193,11 +195,12 @@ private fun DemoScreen() {
             diagnostics = object : AdapterDiagnostics {
                 override fun onRoute(blockKey: String, formats: Set<FormatId>, adapterId: String?, kind: AdapterKind?) {
                     val value = "${formats.joinToString("/")} → ${adapterId ?: "无"} (${kind ?: "-"})"
-                    if (routes[blockKey] != value) routes[blockKey] = value
+                    val key = "${currentName.value}/$blockKey"
+                    if (routes[key] != value) routes[key] = value
                 }
 
                 override fun onFailure(adapterId: String, blockKey: String, error: Throwable?) {
-                    routes[blockKey] = "失败: $adapterId ${error?.message.orEmpty()}"
+                    routes["${currentName.value}/$blockKey"] = "失败: $adapterId ${error?.message.orEmpty()}"
                 }
             },
         )
@@ -215,7 +218,7 @@ private fun DemoScreen() {
                         .fillMaxWidth()
                         .background(if (active) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant)
                         .clickable {
-                            routes.clear()
+                            currentName.value = fixture.name
                             selected.value = fixture
                         }
                         .padding(horizontal = 12.dp, vertical = 10.dp),
@@ -244,9 +247,9 @@ private fun DemoScreen() {
                 modifier = Modifier.padding(bottom = 8.dp),
             )
             LazyColumn {
-                items(routes.toList()) { (key, value) ->
+                items(routes.toList().filter { it.first.startsWith("${currentName.value}/") }) { (key, value) ->
                     Text(
-                        text = "$key  $value",
+                        text = "${key.substringAfter('/')}  $value",
                         style = MaterialTheme.typography.labelSmall,
                         fontFamily = FontFamily.Monospace,
                         modifier = Modifier.padding(vertical = 3.dp),

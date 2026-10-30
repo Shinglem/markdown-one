@@ -72,9 +72,8 @@ public fun MarkdownText(
             document.blocks.forEach { block ->
                 val adapter = registry.select(block, streaming)
                 if (adapter != null) {
-                    // 用 LaunchedEffect 而不是在组合中直接回调：诊断实现可能会写状态，
-                    // 直接回调会形成「重组 → 回调 → 状态变化 → 重组」的循环。
-                    androidx.compose.runtime.LaunchedEffect(block.key, adapter.id) {
+                    // 用块内容参与 key：切到另一个文档时块 key 仍是 b0/b1，只按 key 去重会漏报。
+                    androidx.compose.runtime.LaunchedEffect(block.key, block.raw, adapter.id) {
                         config.diagnostics.onRoute(block.key, block.formats, adapter.id, adapter.kind)
                     }
                     key(block.key) {

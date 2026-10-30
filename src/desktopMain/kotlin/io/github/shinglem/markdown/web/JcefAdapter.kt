@@ -83,7 +83,10 @@ internal class JcefAdapter(private val config: MarkdownConfig) : BlockAdapter {
                     // onPaint 在 CEF 线程回调，帧要排到 EDT（Compose Desktop 的主线程）再写状态。
                     runCatching {
                         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                            CefEngine { bitmap -> javax.swing.SwingUtilities.invokeLater { frame = bitmap } }
+                            CefEngine(
+                                onFrame = { bitmap -> javax.swing.SwingUtilities.invokeLater { frame = bitmap } },
+                                onError = { error -> config.diagnostics.onFailure(id, block.key, error) },
+                            )
                         }.also {
                             engineRef[0] = it
                             it.resize(widthPx, heightPx)

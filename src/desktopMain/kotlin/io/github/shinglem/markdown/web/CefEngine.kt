@@ -21,6 +21,7 @@ import java.util.Base64
  */
 internal class CefEngine(
     private val onFrame: (ImageBitmap) -> Unit,
+    private val onError: (Throwable) -> Unit = {},
 ) {
     @Volatile
     private var viewWidth: Int = 640
@@ -59,6 +60,7 @@ internal class CefEngine(
     fun load(html: String) {
         val encoded = Base64.getEncoder().encodeToString(html.toByteArray(Charsets.UTF_8))
         runCatching { CefRefs.loadURL.invoke(browser, "data:text/html;base64,$encoded") }
+            .onFailure { onError(it) }
     }
 
     /** 关闭本引擎的浏览器与 client；`CefApp` 是全局单例，不能在这里关。 */
@@ -67,12 +69,37 @@ internal class CefEngine(
         runCatching { CefRefs.dispose.invoke(client) }
     }
 
-    /** `CefRenderHandler` 的动态实现：只关心 `getViewRect` 与 `onPaint`。 */
+    /** `CefRenderHandler` 的动态实现：只关心 `getViewRect` / `getScreenInfo` / `onPaint`。 */
     private fun newRenderHandler(): Any {
         val handler = java.lang.reflect.InvocationHandler { _, method, args ->
             when (method.name) {
                 "getViewRect" -> Rectangle(0, 0, viewWidth, viewHeight)
-                "getScreenInfo" -> false
+
+                // 返回 false 或留空字段，CEF 会认为没有可用的屏幕信息而**不出帧**。
+                "getScreenInfo" -> {
+                    val info = args?.getOrNull(1)
+                    if (info == null) {
+                        false
+                    } else {
+                        runCatching {
+                            info.javaClass.getField("device_scale_factor").setDouble(info, 1.0)
+                            info.javaClass.getField("depth").setInt(info, 32)
+                            info.javaClass.getField("depth_per_component").setInt(info, 8)
+                            info.javaClass.getField("is_monochrome").setBoolean(info, false)
+                            listOf("x", "y").forEachIndexed { _, name ->
+                                info.javaClass.getField(name).setInt(info, 0)
+                            }
+                            info.javaClass.getField("width").setInt(info, viewWidth)
+                            info.javaClass.getField("height").setInt(info, viewHeight)
+                            info.javaClass.getField("available_x").setInt(info, 0)
+                            info.javaClass.getField("available_y").setInt(info, 0)
+                            info.javaClass.getField("available_width").setInt(info, viewWidth)
+                            info.javaClass.getField("available_height").setInt(info, viewHeight)
+                            true
+                        }.getOrDefault(false)
+                    }
+                }
+
                 "getScreenPoint" -> args?.getOrNull(1)
                 "getDeviceScaleFactor" -> 1.0
                 "onPaint" -> {
@@ -100,7 +127,7 @@ internal class CefEngine(
         val info = ImageInfo(width, height, ColorType.BGRA_8888, ColorAlphaType.PREMUL)
         runCatching {
             onFrame(Image.makeRaster(info, bytes, width * 4).toComposeImageBitmap())
-        }
+        }.onFailure { onError(it) }
     }
 
     private fun defaultReturn(type: Class<*>): Any? = when (type) {
