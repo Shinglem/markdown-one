@@ -11,10 +11,79 @@ package io.github.shinglem.markdown.parse
  * - 成对标签（`<b>`…`</b>`）才改写，单边标签原样保留 —— 正文里的 `a<b>c` 这类比较符不会被吃掉；
  * - 其它标签（`<div>`/`<details>`/`<span>`…）不在这里处理，交给块级适配器或源码兜底；
  * - ` ``` ` / `~~~` 围栏代码块与行内代码里的内容一律不动；
- * - `<br>` 变成硬换行（行尾两个空格 + 换行），`<img>` 变成 `![alt](src)`，`<a href>` 变成链接。
+ * - `<br>` 变成硬换行（行尾两个空格 + 换行），`<img>` 变成 `![alt](src)`，`<a href>` 变成链接；
+ * - `<table>` 这类「用 HTML 排版」的表格转成 Markdown 表格，借 Markdown 表格渲染器画出对齐与边框。
  */
 internal fun normalizeInlineHtml(source: String): String {
     if (!source.contains('<')) return source
+    return rewriteLines(rewriteTables(source))
+}
+
+/** 先把 `<table>…</table>` 换成 Markdown 表格（跨行，必须在逐行处理之前做）。 */
+private fun rewriteTables(source: String): String {
+    if (!HTML_TABLE.containsMatchIn(source)) return source
+    val fences = fenceRanges(source)
+    return HTML_TABLE.replace(source) { match ->
+        if (fences.any { match.range.first in it || match.range.last in it }) {
+            match.value
+        } else {
+            toMarkdownTable(match)
+        }
+    }
+}
+
+/** 围栏代码块占据的字符区间（这些区间里的内容不参与 HTML 改写）。 */
+private fun fenceRanges(source: String): List<IntRange> {
+    val ranges = mutableListOf<IntRange>()
+    var open = -1
+    var lineStart = 0
+    while (lineStart < source.length) {
+        val eol = source.indexOf('\n', lineStart).let { if (it < 0) source.length else it }
+        val trimmed = source.substring(lineStart, eol).trimStart()
+        if (trimmed.startsWith("```") || trimmed.startsWith("~~~")) {
+            if (open < 0) {
+                open = lineStart
+            } else {
+                ranges += open..eol
+                open = -1
+            }
+        }
+        lineStart = eol + 1
+    }
+    if (open >= 0) ranges += open..source.length - 1
+    return ranges
+}
+
+private fun toMarkdownTable(match: MatchResult): String {
+    val rows = TABLE_ROW.findAll(match.groupValues[1])
+        .map { row -> TABLE_CELL.findAll(row.groupValues[1]).map { cell(it.groupValues[1]) }.toList() }
+        .filter { it.isNotEmpty() }
+        .toList()
+    if (rows.isEmpty()) return match.value
+
+    val width = rows.maxOf { it.size }
+    fun line(cells: List<String>): String =
+        "| " + (cells + List(width - cells.size) { "" }).joinToString(" | ") + " |"
+
+    return buildString {
+        append("\n\n")
+        append(line(rows.first()))
+        append('\n')
+        append("| " + List(width) { "---" }.joinToString(" | ") + " |")
+        rows.drop(1).forEach {
+            append('\n')
+            append(line(it))
+        }
+        append("\n\n")
+    }
+}
+
+/** 单元格内容：允许里面还有行内标签，`|` 与换行必须转义，否则会破坏表格结构。 */
+private fun cell(html: String): String =
+    rewriteTags(html).replace('\n', ' ').replace("|", "\\|").trim()
+
+/** 逐行改写：行内代码（反引号内）原样保留。 */
+private fun rewriteLines(source: String): String {
     val out = StringBuilder(source.length)
     var inFence = false
     var index = 0
@@ -84,6 +153,18 @@ private val BREAK = Regex("""<br\s*/?\s*>""", RegexOption.IGNORE_CASE)
 private val IMAGE = Regex("""<img\b([^>]*)>""", RegexOption.IGNORE_CASE)
 private val LINK = Regex(
     """<a\b([^>]*)>(.*?)</a\s*>""",
+    setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL),
+)
+private val HTML_TABLE = Regex(
+    """<table\b[^>]*>(.*?)</table\s*>""",
+    setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL),
+)
+private val TABLE_ROW = Regex(
+    """<tr\b[^>]*>(.*?)</tr\s*>""",
+    setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL),
+)
+private val TABLE_CELL = Regex(
+    """<t[hd]\b[^>]*>(.*?)</t[hd]\s*>""",
     setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL),
 )
 

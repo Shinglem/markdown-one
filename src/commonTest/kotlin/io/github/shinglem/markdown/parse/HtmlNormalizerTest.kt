@@ -2,6 +2,7 @@ package io.github.shinglem.markdown.parse
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 /**
  * 内联 HTML 的改写规则。
@@ -65,5 +66,23 @@ class HtmlNormalizerTest {
     fun `白名单以外的标签原样保留`() {
         // 避免把正文里的比较符或自定义标签吃掉。
         assertEquals("<span>x</span> 与 a<b>c", normalizeInlineHtml("<span>x</span> 与 a<b>c"))
+    }
+
+    @Test
+    fun `HTML 表格转成 markdown 表格`() {
+        val source = """
+            <table>
+            <tr><th>原生 HTML 表格</th><th>是否渲染</th></tr>
+            <tr><td>inline 标签</td><td>通常支持</td></tr>
+            </table>
+        """.trimIndent()
+        val expected = """
+
+            | 原生 HTML 表格 | 是否渲染 |
+            | --- | --- |
+            | inline 标签 | 通常支持 |
+
+        """.trimIndent()
+        assertTrue(normalizeInlineHtml(source).contains(expected), normalizeInlineHtml(source))
     }
 }

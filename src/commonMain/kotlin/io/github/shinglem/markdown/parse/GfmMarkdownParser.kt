@@ -31,7 +31,9 @@ public class GfmMarkdownParser : MarkdownParser {
 
         val blocks = buildList {
             tree.children.forEachIndexed { index, node ->
-                toBlock(text, node, index)?.let(::add)
+                // 有的 `$…$` 会被 GFM 拆成散装节点（左界符前不是空白），先补成 INLINE_MATH。
+                val repaired = repairInlineMath(node, text)
+                toBlock(text, repaired, index)?.let(::add)
             }
         }
         return MdDocument(mergeDetails(blocks, text), streaming)
