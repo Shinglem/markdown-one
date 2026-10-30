@@ -44,7 +44,7 @@ class StreamingParseTest {
     fun `整段公式识别为 math 块`() {
         val block = parser.parse("$$\nE = mc^2\n$$", streaming = false).blocks.single()
         assertTrue(block is MdBlock.Math)
-        assertEquals("E = mc^2", (block as MdBlock.Math).tex)
+        assertEquals("E = mc^2", block.tex)
     }
 
     @Test
