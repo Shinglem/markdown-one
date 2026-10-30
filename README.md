@@ -109,7 +109,13 @@ markdown-one/
 
 # 用 JBR with JCEF 跑（自动加 --add-modules jcef 等参数），验证 JCEF 回落
 ./gradlew :demo:run -PjbrHome="C:\path\to\jbrsdk_jcef" -Pfixture=6
+
+# 大批块的初始缩放（验证横向滚动条）与正文初始滚动位置
+./gradlew :demo:run -Pzoom=1.5 -Pscroll=760
 ```
+
+`-Pfixture` / `-Pzoom` / `-Pscroll` 也接受环境变量 `DEMO_FIXTURE` / `DEMO_ZOOM` / `DEMO_SCROLL`
+（Gradle 会累积 `jvmArgs`，同一次 daemon 里反复换 `-P` 值不一定生效，截图脚本用环境变量更稳）。
 
 demo 左侧是 fixture 列表，右侧「适配器路由」实时显示**每个块命中的适配器**，
 是这套架构最有效的自检工具。`复杂综合文档` 覆盖了标题（含 setext）、行内格式、
@@ -215,10 +221,17 @@ MarkdownText(markdown, config = MarkdownConfig(theme = outsidePaperTheme()))
 MarkdownConfig(
     viewport = BlockViewportConfig(
         maxHeight = 420.dp,
+        // 默认值。`table` 能生效是因为 MdBlock.Table 的 formats 里同时带了 `markdown` 与 `table`。
         formats = setOf("mermaid", "html", "table", "image.generic"),
+        initialZoom = 1f,
     ),
 )
 ```
+
+滚动条是叠加在内容上的（不参与布局），桌面端用 Compose 原生 `VerticalScrollbar` / `HorizontalScrollbar`。
+缩放实现是「**先布局放大、再 `graphicsLayer` 缩放**」：`Modifier.scaleLayout()` 必须包在
+`Modifier.width(availableWidth)` **外面**，否则内容宽度停留在原尺寸，横向滚动范围算出来是 0，
+横条永远不出现（实测踩过一次）。
 
 **不要往 `formats` 里加 `code`**：代码块自带横向滚动，再被本容器包一层就成了滚动容器嵌套，
 Compose 会直接抛 `Horizontally scrollable component was measured with an infinity maximum width`。
@@ -232,8 +245,16 @@ Compose 会直接抛 `Horizontally scrollable component was measured with an inf
 MarkdownConfig(jcefPoolSize = 2)   // 默认 2
 ```
 
-分配是**先到先得 + 池满排队**，不做抢占 —— 抢占会让「3 个块可见、容量 2」的场景互相踢，
-实测结果是三个块都在重建引擎、谁也渲染不出来。块滚出视口时归还池位，排队中的块借池版本号重新申请。
+名额**由可见性决定**：块在 `onGloballyPositioned` 里上报自己到视口中心的距离（含半屏预取 margin），
+池子按「已持有 → 距离近」排序取前 `jcefPoolSize` 个。滚出范围的块归还名额并释放引擎，
+滚进来的块接手重建。
+
+为什么不是先到先得：第一帧所有块同时申请，离屏的块会占着名额不放，屏幕上真正可见的块反而一直显示
+「等待浏览器实例」（实测复现）。为什么不做「引擎轮转复用」（同一个 `CefBrowser` 换块、反复 `loadURL`）：
+native 层直接崩，`exit 0x80000003`，连 Java 堆栈都没有。
+
+首块永远空白是另一个独立的坑：**第一个 `CefBrowser` 上「创建后再 `loadURL`」会丢**。
+内容必须作为**初始 URL** 传给 `CefBrowserOsrWithHandler` 的构造函数，见 `CefEngine.dataUrl`。
 
 ## 许可证
 

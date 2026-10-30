@@ -42,5 +42,13 @@ compose.desktop {
         providers.gradleProperty("fixture").orNull?.let {
             jvmArgs += "-Ddemo.fixture=$it"
         }
+        // 初始缩放（验证横向滚动条）：-Pzoom=1.5
+        providers.gradleProperty("zoom").orNull?.let {
+            jvmArgs += "-Ddemo.zoom=$it"
+        }
+        // 正文初始滚动位置：-Pscroll=520
+        providers.gradleProperty("scroll").orNull?.let {
+            jvmArgs += "-Ddemo.scroll=$it"
+        }
     }
 }

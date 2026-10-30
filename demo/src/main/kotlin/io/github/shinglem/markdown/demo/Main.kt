@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
+import io.github.shinglem.markdown.BlockViewportConfig
 import io.github.shinglem.markdown.MarkdownConfig
 import io.github.shinglem.markdown.MarkdownText
 import io.github.shinglem.markdown.OutsidePaper
@@ -338,8 +339,9 @@ fun main() = application {
 @Composable
 private fun DemoScreen() {
     val initial = remember {
-        // -Ddemo.fixture 支持名称或序号（序号更安全，避免命令行中文编码问题）
-        val wanted = System.getProperty("demo.fixture")
+        // -Ddemo.fixture（或环境变量 DEMO_FIXTURE）支持名称或序号：
+        // 序号更安全，避免命令行中文编码问题。
+        val wanted = System.getProperty("demo.fixture") ?: System.getenv("DEMO_FIXTURE")
         FIXTURES.firstOrNull { it.name == wanted }
             ?: wanted?.toIntOrNull()?.let { FIXTURES.getOrNull(it) }
             ?: FIXTURES.first()
@@ -353,13 +355,23 @@ private fun DemoScreen() {
 
     val theme = outsidePaperTheme(dark = darkPaper)
 
-    val config = remember(theme) {
+    // -Ddemo.zoom=1.5（或 DEMO_ZOOM）把每块视口的初始缩放拉起来，用来验证横向滚动条。
+    val initialZoom = remember {
+        (System.getProperty("demo.zoom") ?: System.getenv("DEMO_ZOOM"))?.toFloatOrNull() ?: 1f
+    }
+    // -Ddemo.scroll=520（或 DEMO_SCROLL）把正文滚到指定位置，方便截图核对屏幕外的大块。
+    val contentScroll = remember {
+        (System.getProperty("demo.scroll") ?: System.getenv("DEMO_SCROLL"))?.toIntOrNull() ?: 0
+    }
+
+    val config = remember(theme, initialZoom) {
         MarkdownConfig(
             adapters = listOf(DemoMathAdapter()),
             // 开关演示：原始 HTML 块交给 JCEF 渲染；运行环境没有 org.cef 时自动退回源码。
             webFallback = WebFallback.Jcef,
             allowRawHtml = true,
             theme = theme,
+            viewport = BlockViewportConfig(initialZoom = initialZoom),
             diagnostics = object : AdapterDiagnostics {
                 override fun onRoute(blockKey: String, formats: Set<FormatId>, adapterId: String?, kind: AdapterKind?) {
                     val value = "${formats.joinToString("/")} → ${adapterId ?: "无"} (${kind ?: "-"})"
@@ -406,7 +418,11 @@ private fun DemoScreen() {
 
         VerticalDivider(color = paper.divider.copy(alpha = 0.3f))
 
-        Column(Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()).padding(24.dp)) {
+        Column(
+            Modifier.weight(1f).fillMaxHeight()
+                .verticalScroll(rememberScrollState(initial = contentScroll))
+                .padding(24.dp),
+        ) {
             MarkdownText(
                 markdown = selected.value.markdown,
                 streaming = selected.value.streaming,
