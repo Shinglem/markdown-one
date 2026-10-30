@@ -31,7 +31,10 @@ import io.github.shinglem.markdown.MarkdownConfig
 import io.github.shinglem.markdown.MarkdownText
 import io.github.shinglem.markdown.adapter.AdapterDiagnostics
 import io.github.shinglem.markdown.adapter.AdapterKind
+import io.github.shinglem.markdown.adapter.BlockAdapter
 import io.github.shinglem.markdown.adapter.FormatId
+import io.github.shinglem.markdown.adapter.Formats
+import io.github.shinglem.markdown.model.MdBlock
 
 private data class Fixture(val name: String, val markdown: String, val streaming: Boolean = false)
 
@@ -121,6 +124,41 @@ private val FIXTURES = listOf(
 )
 
 /**
+ * 演示「自己写一个适配器」：接管数学公式块。
+ *
+ * 真实项目里这里可以换成 KaTeX/JCEF/原生排版；本 demo 只证明扩展点可用 ——
+ * 注册后右侧路由面板会显示 `math → demo.math (Native)`。
+ */
+private class DemoMathAdapter : BlockAdapter {
+    override val id: String = "demo.math"
+    override val kind: AdapterKind = AdapterKind.Native
+    override val priority: Int = 120
+
+    override fun formats(): Set<FormatId> = setOf(Formats.Math)
+
+    override fun isAvailable(): Boolean = true
+
+    override fun canRender(block: MdBlock): Boolean = block is MdBlock.Math
+
+    @Composable
+    override fun Render(block: MdBlock, modifier: Modifier) {
+        val math = block as MdBlock.Math
+        Column(modifier.padding(vertical = 4.dp)) {
+            Text(
+                text = "公式（demo 未配置渲染器）",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = math.tex,
+                style = MaterialTheme.typography.bodyMedium,
+                fontFamily = FontFamily.Monospace,
+            )
+        }
+    }
+}
+
+/**
  * sandbox：左 fixture、中渲染、右**适配器路由面板**。
  *
  * 路由面板是这套架构最重要的自检工具 —— 每个块命中了哪个适配器、什么优先级、什么类型，
@@ -147,6 +185,7 @@ private fun DemoScreen() {
 
     val config = remember {
         MarkdownConfig(
+            adapters = listOf(DemoMathAdapter()),
             diagnostics = object : AdapterDiagnostics {
                 override fun onRoute(blockKey: String, formats: Set<FormatId>, adapterId: String?, kind: AdapterKind?) {
                     val value = "${formats.joinToString("/")} → ${adapterId ?: "无"} (${kind ?: "-"})"

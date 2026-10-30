@@ -121,6 +121,14 @@ class AdapterRegistryTest {
         val paragraph = parser.parse("普通段落", streaming = false).blocks.single()
         assertNull(registry.select(paragraph, streaming = false))
     }
+
+    @Test
+    fun `自定义适配器可接管内置管不到的格式`() {
+        val custom = FakeAdapter("demo.math", priority = 120, accepts = setOf(Formats.Math))
+        val registry = buildAdapterRegistry(MarkdownConfig(adapters = listOf(custom)))
+        val math = parser.parse("$$\nE = mc^2\n$$", streaming = false).blocks.single()
+        assertEquals("demo.math", registry.select(math, streaming = false)?.id)
+    }
 }
 
 private object SourceFallbackForTest : BlockAdapter {

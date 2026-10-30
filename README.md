@@ -105,6 +105,56 @@ markdown-one/
 ./gradlew :demo:run      # sandbox
 ```
 
+## 扩展：接入你自己的适配器
+
+库只内置纯 Compose 的适配器。任何需要平台能力（内嵌浏览器、原生控件）的内容，
+由调用方自己实现 [BlockAdapter] 并通过 `MarkdownConfig.adapters` 注册。
+
+### 最小实现
+
+```kotlin
+class MyMathAdapter : BlockAdapter {
+    override val id = "my.math"
+    override val kind = AdapterKind.Native
+    override val priority = 120                  // 高于内置的 100 即接管
+    override fun formats() = setOf(Formats.Math) // 也可声明多种格式
+    override fun isAvailable() = true
+    override fun canRender(block: MdBlock) = block is MdBlock.Math
+
+    @Composable
+    override fun Render(block: MdBlock, modifier: Modifier) {
+        val math = block as MdBlock.Math
+        // 画不出来时自行显示 math.raw —— 库的兜底只在「没有适配器命中」时生效
+    }
+}
+
+MarkdownText(markdown, config = MarkdownConfig(adapters = listOf(MyMathAdapter())))
+```
+
+自动发现也可用：在可选 artifact 里放
+`META-INF/services/io.github.shinglem.markdown.adapter.BlockAdapterFactory`，实现 `BlockAdapterFactory`，
+依赖在 classpath 上就会生效（JVM/desktop 端）。
+
+### 用 JCEF 兜底原生画不出的内容
+
+库**不内置** JCEF 适配器，原因有两个：`jcef.jmod` 175 MB + `libcef.dll` 262 MB 不该由每个使用者背；
+是否带 Chromium 属于分发决策。需要时请自己实现，并注意：
+
+1. **运行时**：必须用 **JBR with JCEF**（或自备 CEF 运行时），启动参数加 `--add-modules jcef`。
+   标准 OpenJDK 上没有 `org.cef`，`isAvailable()` 要据此返回 false，让链路自动降级。
+2. **编译期**：`jcef.jmod` 不能直接进 classpath，需 `jmod extract` 出 classes 打成 jar 后
+   `compileOnly` 引入。
+3. **三个必须自己处理的点**（本设计原本要做的，也就是真正的难点）：
+   - **有界高度**：OSR 的 `CefRenderHandler.onPaint` 拿不到高度就不会绘制，
+     LazyColumn 里必须由内容回传 `scrollHeight` 再设 `Modifier.height(..)`；
+   - **实例池**：每个 `CefBrowser` 是独立 Chromium 渲染进程，一块一个会瞬间打爆内存；
+   - **网络白名单**：LLM 输出里的 `<img src="http://...">` 是追踪像素，必须在
+     `CefRequestHandler.onBeforeResourceLoad` 里拦掉，并关掉 `file_access` / `local_storage`。
+
+参考：`AdapterKind.Jcef` 只是给诊断面板用的标签，不影响路由 —— 流式期间 kind 为 `Jcef`
+的适配器会被自动跳过，避免每帧重载浏览器内容。
+
 ## 许可证
 
-待定。
+[Apache-2.0](LICENSE)。
+
