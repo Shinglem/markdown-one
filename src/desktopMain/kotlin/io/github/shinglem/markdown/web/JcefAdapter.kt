@@ -11,16 +11,16 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import io.github.shinglem.markdown.MarkdownConfig
@@ -30,6 +30,7 @@ import io.github.shinglem.markdown.adapter.FormatId
 import io.github.shinglem.markdown.adapter.Formats
 import io.github.shinglem.markdown.adapter.LocalIsStreaming
 import io.github.shinglem.markdown.model.MdBlock
+import io.github.shinglem.markdown.rootSize
 
 /**
  * JCEF 回落适配器（`kind = Jcef`），走**离屏渲染**。
@@ -78,26 +79,13 @@ internal class JcefAdapter(private val config: MarkdownConfig) : BlockAdapter {
             )
         }
         val density = LocalDensity.current
-        val windowHeight = LocalWindowInfo.current.containerSize.height
 
-        // 池位：数量受限，池满时排队（先到先得，不抢占）。
-        val granted = JcefPool.isActive(block.key)
-        val poolVersion = JcefPool.version
-        // 初值 true：先申请（文档顺序靠前的块优先），之后靠 onGloballyPositioned 纠正。
-        // 初值给 false 的话，若窗口尺寸拿不到（containerSize 可能为 0），一个块都申请不到。
-        var visible by remember(block.key) { mutableStateOf(true) }
+        SideEffect { JcefBudget.capacity = config.jcefPoolSize }
 
-        LaunchedEffect(granted, visible, block.key, poolVersion) {
-            JcefPool.capacity = config.jcefPoolSize
-            if (visible) {
-                JcefPool.acquire(block.key)
-            } else if (granted) {
-                // 滚出视口就还回去，让排队中的块有机会拿到。
-                JcefPool.release(block.key)
-            }
-        }
+        // 名额由可见性决定：块在 onGloballyPositioned 里上报位置，JcefBudget 按距离分配。
+        val granted = JcefBudget.isGranted(block.key)
 
-        // 失去池位就临时释放浏览器（Chromium 进程），重新拿到时下面的 request 会重建。
+        // 失去名额就释放浏览器（Chromium 进程），重新拿到时下面的 request 会重建。
         LaunchedEffect(granted) {
             if (!granted) {
                 slot.releaseEngine()
@@ -115,7 +103,7 @@ internal class JcefAdapter(private val config: MarkdownConfig) : BlockAdapter {
         DisposableEffect(block.key) {
             onDispose {
                 slot.dispose()
-                JcefPool.release(block.key)
+                JcefBudget.forget(block.key)
             }
         }
 
@@ -124,10 +112,23 @@ internal class JcefAdapter(private val config: MarkdownConfig) : BlockAdapter {
                 .fillMaxWidth()
                 .height(config.webFallbackHeight)
                 .onGloballyPositioned { coords ->
-                    if (windowHeight <= 0) return@onGloballyPositioned
-                    val bounds = coords.boundsInWindow()
-                    val nowVisible = bounds.bottom > 0 && bounds.top < windowHeight
-                    if (nowVisible != visible) visible = nowVisible
+                    val rootHeight = coords.rootSize().height
+                    if (rootHeight <= 0) return@onGloballyPositioned
+                    val bounds = coords.boundsInRoot()
+                    // LazyColumn 预组合但尚未测量的项 bounds 全零，不能当成「在视口中心」参与分配。
+                    if (bounds.width <= 0f || bounds.height <= 0f) {
+                        JcefBudget.report(block.key, null)
+                        return@onGloballyPositioned
+                    }
+                    // 预取半屏：滚动时下一块能提前开始初始化，减少「等待中」的观感。
+                    val margin = config.webFallbackHeight.value * density.density * 0.5f
+                    val inRange = bounds.bottom > -margin && bounds.top < rootHeight + margin
+                    if (inRange) {
+                        val center = (bounds.top + bounds.bottom) / 2f
+                        JcefBudget.report(block.key, kotlin.math.abs(center - rootHeight / 2f))
+                    } else {
+                        JcefBudget.report(block.key, null)
+                    }
                 },
         ) {
             val widthPx = with(density) { maxWidth.roundToPx() }
@@ -135,7 +136,7 @@ internal class JcefAdapter(private val config: MarkdownConfig) : BlockAdapter {
 
             if (!granted) {
                 Text(
-                    text = "等待浏览器实例（池上限 ${config.jcefPoolSize}）",
+                    text = "等待浏览器实例（上限 ${config.jcefPoolSize}）",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

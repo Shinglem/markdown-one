@@ -22,6 +22,7 @@ import java.util.Base64
 internal class CefEngine(
     private val onFrame: (ImageBitmap) -> Unit,
     private val onError: (Throwable) -> Unit = {},
+    initialUrl: String = "about:blank",
 ) {
     @Volatile
     private var viewWidth: Int = 640
@@ -41,7 +42,8 @@ internal class CefEngine(
         val requestContext = CefRefs.getGlobalContext.invoke(null)
             ?: error("CefRequestContext.getGlobalContext 返回 null")
 
-        browser = CefRefs.osrCtor.newInstance(client, "about:blank", requestContext, newRenderHandler())
+        // 内容直接用初始 URL 传进去：创建后再 `loadURL` 在**首个浏览器**上会丢（实测首块永远全白）。
+        browser = CefRefs.osrCtor.newInstance(client, initialUrl, requestContext, newRenderHandler())
             ?: error("CefBrowserOsrWithHandler 构造返回 null")
 
         // OSR 浏览器惰性创建：不显式创建就没有渲染进程，onPaint 永远不会来（实测）。
@@ -58,9 +60,15 @@ internal class CefEngine(
     }
 
     fun load(html: String) {
-        val encoded = Base64.getEncoder().encodeToString(html.toByteArray(Charsets.UTF_8))
-        runCatching { CefRefs.loadURL.invoke(browser, "data:text/html;base64,$encoded") }
+        runCatching { CefRefs.loadURL.invoke(browser, dataUrl(html)) }
             .onFailure { onError(it) }
+    }
+
+    companion object {
+        fun dataUrl(html: String): String {
+            val encoded = Base64.getEncoder().encodeToString(html.toByteArray(Charsets.UTF_8))
+            return "data:text/html;base64,$encoded"
+        }
     }
 
     /** 关闭本引擎的浏览器与 client；`CefApp` 是全局单例，不能在这里关。 */

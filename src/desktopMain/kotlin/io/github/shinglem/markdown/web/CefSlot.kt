@@ -21,15 +21,22 @@ internal class CefSlot(
     private var engine: CefEngine? = null
     private var creating = false
     private var disposed = false
+
+    /** 「还需要浏览器吗」。释放后为 false；创建完成时若已变回 true 就保留引擎，避免白等一场。 */
+    private var wanted = true
     private var pendingWidth = 0
     private var pendingHeight = 0
     private var pendingHtml: String? = null
+
+    /** 已交给引擎的内容，避免同一份 HTML 重复加载。 */
+    private var loadedHtml: String? = null
 
     /** 幂等：首次调用触发创建，之后只应用尺寸与内容。可安全地随 key 变化重复调用。 */
     fun request(width: Int, height: Int, html: String?) {
         val startCreate: Boolean
         val ready: CefEngine?
         synchronized(lock) {
+            wanted = true
             if (width > 0 && height > 0) {
                 pendingWidth = width
                 pendingHeight = height
@@ -42,23 +49,43 @@ internal class CefSlot(
 
         if (ready != null) {
             if (width > 0 && height > 0) ready.resize(width, height)
-            html?.let(ready::load)
+            if (html != null && html != loadedHtml) {
+                loadedHtml = html
+                ready.load(html)
+            }
             return
         }
         if (!startCreate) return
 
         // 独立线程：不绑定 Compose 协程生命周期，因此不会因为重组被中途丢弃。
         Thread({
-            runCatching { CefEngine(onFrame, onError) }
+            // 首个浏览器上「创建后再 loadURL」会丢（实测首块永远全白），所以内容走初始 URL。
+            val initialHtml = synchronized(lock) { pendingHtml }
+            val initialUrl = initialHtml?.let(CefEngine::dataUrl) ?: "about:blank"
+            runCatching { CefEngine(onFrame, onError, initialUrl) }
                 .onSuccess { created ->
-                    val (w, h, pending) = synchronized(lock) {
-                        engine = created
+                    // 创建期间可能已经被释放/销毁：此时必须把刚建好的引擎丢掉，否则泄漏一个 Chromium 进程。
+                    val ready = synchronized(lock) {
                         creating = false
-                        Triple(pendingWidth, pendingHeight, pendingHtml)
+                        if (disposed || !wanted) {
+                            null
+                        } else {
+                            engine = created
+                            loadedHtml = initialHtml
+                            Triple(pendingWidth, pendingHeight, pendingHtml)
+                        }
                     }
-                    if (w > 0 && h > 0) created.resize(w, h)
-                    pending?.let(created::load)
-                    if (disposed) synchronized(lock) { engine = null }?.let { created.dispose() }
+                    if (ready == null) {
+                        created.dispose()
+                    } else {
+                        val (w, h, pending) = ready
+                        if (w > 0 && h > 0) created.resize(w, h)
+                        // 内容已经作为初始 URL 加载过了，只有创建期间内容更新才需要再 load。
+                        if (pending != null && pending != initialHtml) {
+                            synchronized(lock) { loadedHtml = pending }
+                            created.load(pending)
+                        }
+                    }
                 }
                 .onFailure { error ->
                     synchronized(lock) { creating = false }
@@ -69,7 +96,12 @@ internal class CefSlot(
 
     /** 临时释放引擎（池位被别的块抢走），之后还能再次 [request] 重建。 */
     fun releaseEngine() {
-        val current = synchronized(lock) { engine.also { engine = null } }
+        val current = synchronized(lock) {
+            wanted = false
+            val existing = engine
+            engine = null
+            existing
+        }
         current?.dispose()
     }
 
@@ -77,8 +109,9 @@ internal class CefSlot(
     fun dispose() {
         val current = synchronized(lock) {
             disposed = true
-            creating = false
-            engine.also { engine = null }
+            val existing = engine
+            engine = null
+            existing
         }
         current?.dispose()
     }
