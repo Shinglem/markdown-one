@@ -1,0 +1,22 @@
+# ============================================================================
+#  markdown-one · 版本目录
+#  ---------------------------------------------------------------------------
+#  这里**只放插件版本**。
+#
+#  为什么第三方依赖的版本不在这里：本仓库同时会被宿主工程以 submodule 挂载，
+#  Gradle 的 version catalog 是**按构建根解析**的 —— 挂载后 `libs` 指向宿主的
+#  gradle/libs.versions.toml，宿主里没有的条目会让脚本直接报错。
+#  所以依赖坐标与版本写在 build.gradle.kts 顶部的字面量里（两种构建都能解析）。
+#
+#  插件必须用 alias：宿主构建里借此强制与本仓库的 Kotlin / Compose 插件版本一致。
+# ============================================================================
+
+[versions]
+kotlin = "2.4.21"
+compose = "1.12.2"
+
+[plugins]
+kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
+kotlin-jvm           = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+compose-compiler     = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+compose              = { id = "org.jetbrains.compose", version.ref = "compose" }

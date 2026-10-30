@@ -1,0 +1,26 @@
+name: build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      # 用官方 Gradle 发行版，绕开 wrapper 里的国内镜像 URL（境外构建机不可达）
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.8.0'
+
+      - name: Build and test
+        run: gradle build -Pmirror=off --no-daemon --stacktrace

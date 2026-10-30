@@ -1,0 +1,215 @@
+package io.github.shinglem.markdown.demo
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.VerticalDivider
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Window
+import androidx.compose.ui.window.application
+import androidx.compose.ui.window.rememberWindowState
+import io.github.shinglem.markdown.MarkdownConfig
+import io.github.shinglem.markdown.MarkdownText
+import io.github.shinglem.markdown.adapter.AdapterDiagnostics
+import io.github.shinglem.markdown.adapter.AdapterKind
+import io.github.shinglem.markdown.adapter.FormatId
+
+private data class Fixture(val name: String, val markdown: String, val streaming: Boolean = false)
+
+private val FIXTURES = listOf(
+    Fixture(
+        "基础语法",
+        """
+        # 标题一
+        ## 标题二
+
+        一段普通文本，含 **粗体**、*斜体*、`行内代码` 与 [链接](https://example.com)。
+
+        - 列表项一
+        - 列表项二
+          - 嵌套项
+
+        1. 有序一
+        2. 有序二
+
+        > 引用块
+
+        ---
+        """.trimIndent(),
+    ),
+    Fixture(
+        "代码块",
+        """
+        ```kotlin
+        fun main() {
+            println("hello")
+        }
+        ```
+
+        ```json
+        { "a": 1, "b": [true, null] }
+        ```
+
+        ```sql
+        select id, name from users where id = 1;
+        ```
+
+        ```未知语言
+        这段没有高亮规则
+        ```
+        """.trimIndent(),
+    ),
+    Fixture(
+        "表格",
+        """
+        | 列 A | 列 B | 列 C |
+        | --- | --- | --- |
+        | 1 | 2 | 3 |
+        | 中文 | `code` | **粗** |
+        """.trimIndent(),
+    ),
+    Fixture(
+        "图表",
+        """
+        ```mermaid
+        flowchart LR
+          A[开始] --> B{判断}
+          B -->|是| C[结束]
+          B -->|否| A
+        ```
+        """.trimIndent(),
+    ),
+    Fixture(
+        "流式未闭合",
+        """
+        正在回答中……
+
+        ```kotlin
+        val x = 1
+        """.trimIndent(),
+        streaming = true,
+    ),
+    Fixture(
+        "原始 HTML 与公式",
+        """
+        <div align="center">一段原始 HTML</div>
+
+        $$
+        E = mc^2
+        $$
+        """.trimIndent(),
+    ),
+)
+
+/**
+ * sandbox：左 fixture、中渲染、右**适配器路由面板**。
+ *
+ * 路由面板是这套架构最重要的自检工具 —— 每个块命中了哪个适配器、什么优先级、什么类型，
+ * 一眼可见；改优先级或禁用一个适配器，结果立刻反映出来。
+ */
+fun main() = application {
+    Window(
+        onCloseRequest = ::exitApplication,
+        title = "markdown-one demo",
+        state = rememberWindowState(width = 1500.dp, height = 950.dp),
+    ) {
+        MaterialTheme {
+            Surface {
+                DemoScreen()
+            }
+        }
+    }
+}
+
+@Composable
+private fun DemoScreen() {
+    val selected = remember { mutableStateOf(FIXTURES.first()) }
+    val routes = remember { mutableStateMapOf<String, String>() }
+
+    val config = remember {
+        MarkdownConfig(
+            diagnostics = object : AdapterDiagnostics {
+                override fun onRoute(blockKey: String, formats: Set<FormatId>, adapterId: String?, kind: AdapterKind?) {
+                    val value = "${formats.joinToString("/")} → ${adapterId ?: "无"} (${kind ?: "-"})"
+                    if (routes[blockKey] != value) routes[blockKey] = value
+                }
+
+                override fun onFailure(adapterId: String, blockKey: String, error: Throwable?) {
+                    routes[blockKey] = "失败: $adapterId ${error?.message.orEmpty()}"
+                }
+            },
+        )
+    }
+
+    Row(Modifier.fillMaxSize()) {
+        Column(Modifier.width(200.dp).fillMaxHeight().background(MaterialTheme.colorScheme.surfaceVariant)) {
+            FIXTURES.forEach { fixture ->
+                val active = fixture == selected.value
+                Text(
+                    text = fixture.name,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (active) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(if (active) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant)
+                        .clickable {
+                            routes.clear()
+                            selected.value = fixture
+                        }
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                )
+            }
+        }
+
+        VerticalDivider()
+
+        Column(Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()).padding(24.dp)) {
+            MarkdownText(
+                markdown = selected.value.markdown,
+                streaming = selected.value.streaming,
+                config = config,
+            )
+        }
+
+        VerticalDivider()
+
+        Column(Modifier.width(360.dp).fillMaxHeight().padding(16.dp)) {
+            Text("适配器路由", style = MaterialTheme.typography.titleSmall)
+            Text(
+                text = "块 → 命中的适配器 (kind)",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 8.dp),
+            )
+            LazyColumn {
+                items(routes.toList()) { (key, value) ->
+                    Text(
+                        text = "$key  $value",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontFamily = FontFamily.Monospace,
+                        modifier = Modifier.padding(vertical = 3.dp),
+                    )
+                }
+            }
+        }
+    }
+}
