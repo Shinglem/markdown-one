@@ -42,7 +42,17 @@ internal class HtmlContainerAdapter(private val config: MarkdownConfig) : BlockA
         val raw = block.raw
         val inner = remember(raw) { unwrap(raw) }
         if (inner.isBlank()) return
+        if (inner == raw.trim()) {
+            // 一个容器标签都没剥掉：说明这个 HTML 块不是我们认识的容器结构。
+            // 直接显示源码 —— 绝不能递归渲染原文，否则自己会再次命中本适配器（栈溢出）。
+            SourceFallbackAdapter.Render(block, modifier)
+            return
+        }
 
+        // 内层禁用本适配器：内容里再出现裸 HTML 块时走源码兜底，杜绝递归。
+        val nested = remember(config) {
+            config.copy(disabledAdapterIds = config.disabledAdapterIds + id)
+        }
         val align = remember(raw) {
             ALIGN.find(raw)?.let { match ->
                 if (match.groupValues[1].equals("right", ignoreCase = true)) {
@@ -53,13 +63,13 @@ internal class HtmlContainerAdapter(private val config: MarkdownConfig) : BlockA
             }
         }
         if (align == null) {
-            MarkdownText(markdown = inner, config = config, modifier = modifier)
+            MarkdownText(markdown = inner, config = nested, modifier = modifier)
         } else {
             // 两层都要：外层 Box 让整块贴着容器中/右，内层 textAlign 让多行文字各自居中。
             Box(modifier.fillMaxWidth(), contentAlignment = align.first) {
                 MarkdownText(
                     markdown = inner,
-                    config = config,
+                    config = nested,
                     modifier = Modifier.wrapContentWidth(),
                     textAlign = align.second,
                     fillWidth = false,
