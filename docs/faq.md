@@ -81,7 +81,7 @@ MarkdownConfig(webFallback = WebFallback.Source)   // 默认值，只是显式�
 但有非 daemon 线程未结束，多半来自 CEF 的全局 `CefApp`）。
 
 workaround：宿主在窗口关闭流程里显式兜底退出。库本身不强制 `exitProcess`，
-避免把宿主的其他窗口一起杀掉。
+避免把宿主的其他窗口一起杀掉。这条在 [路线图](roadmap.md#2-进程退出兜底) 里。
 
 ## 流式输出时图表一直在「生成中」
 

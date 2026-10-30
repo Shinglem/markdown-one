@@ -104,8 +104,10 @@ MdBlock ──► AdapterRegistry
 | [JCEF 回落](docs/jcef.md) | 运行环境、开关、六个静默失败的坑、名额与生命周期、安全 |
 | [API 参考](docs/api.md) | `MarkdownText` / `MarkdownConfig` / `BlockViewportConfig` / `MdBlock` / 主题 |
 | [常见问题](docs/faq.md) | 显示成源码、图表画不出、空白帧、滚动条、性能 |
+| [路线图](docs/roadmap.md) | 正在进行、接下来、明确不做的事 |
 | [贡献指南](CONTRIBUTING.md) | 环境、自检清单、代码风格、提交规范、加 target |
 | [变更日志](CHANGELOG.md) | 版本历史与已知问题 |
+| [安全策略](SECURITY.md) | 威胁模型：不可信 Markdown、JCEF 攻击面、推荐配置 |
 
 ## 开发
 

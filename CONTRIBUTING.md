@@ -89,6 +89,8 @@ KMP project 依赖要求 target 名对齐。多端化时要和宿主一起改。
 - `AdapterDiagnostics` 的路由输出，或 demo 右侧面板的截图；
 - 如果是 JCEF 相关，贴出 CEF 的 native 日志（`cache_path` 目录下的 `*.log`）。
 
+**安全问题不要开公开 issue**，走 [SECURITY.md](SECURITY.md) 的私密通道。
+
 ## 许可证
 
 提交即表示同意以 [Apache-2.0](LICENSE) 授权你的贡献。
