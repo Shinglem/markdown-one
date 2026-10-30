@@ -85,7 +85,7 @@ internal class MermaidAdapter(private val config: MarkdownConfig) : BlockAdapter
                 onRenderResult = { result ->
                     if (result is GMResult.Ok) {
                         val scene = result.value
-                        if (scene.height > 0.0) aspect = (scene.width / scene.height).toFloat()
+                        if (scene.height > 0.0) aspect = scene.width / scene.height
                     }
                 },
             )
