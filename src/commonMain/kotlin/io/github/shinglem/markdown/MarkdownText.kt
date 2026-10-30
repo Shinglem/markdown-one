@@ -16,6 +16,7 @@ import com.mikepenz.markdown.compose.LocalMarkdownAnimations
 import com.mikepenz.markdown.compose.LocalMarkdownAnnotator
 import com.mikepenz.markdown.compose.LocalMarkdownColors
 import com.mikepenz.markdown.compose.LocalMarkdownComponents
+import com.mikepenz.markdown.coil3.Coil3ImageTransformerImpl
 import com.mikepenz.markdown.compose.LocalMarkdownDimens
 import com.mikepenz.markdown.compose.LocalMarkdownExtendedSpans
 import com.mikepenz.markdown.compose.LocalMarkdownInlineContent
@@ -24,7 +25,6 @@ import com.mikepenz.markdown.compose.LocalMarkdownTypography
 import com.mikepenz.markdown.compose.LocalReferenceLinkHandler
 import com.mikepenz.markdown.m3.markdownColor
 import com.mikepenz.markdown.m3.markdownTypography
-import com.mikepenz.markdown.model.NoOpImageTransformerImpl
 import com.mikepenz.markdown.model.ReferenceLinkHandlerImpl
 import com.mikepenz.markdown.model.markdownAnimations
 import com.mikepenz.markdown.model.markdownAnnotator
@@ -77,7 +77,7 @@ public fun MarkdownText(
             LocalMarkdownTypography provides typography,
             LocalMarkdownDimens provides dimens,
             LocalMarkdownPadding provides padding,
-            LocalImageTransformer provides NoOpImageTransformerImpl(),
+            LocalImageTransformer provides Coil3ImageTransformerImpl,
             LocalMarkdownAnnotator provides markdownAnnotator(),
             LocalMarkdownExtendedSpans provides markdownExtendedSpans(),
             LocalMarkdownInlineContent provides markdownInlineContent(),

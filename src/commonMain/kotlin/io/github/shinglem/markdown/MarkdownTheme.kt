@@ -4,6 +4,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.TextStyle
@@ -151,5 +152,78 @@ public fun outsidePaperTheme(dark: Boolean = false): MarkdownTheme {
         ),
         padding = markdownPadding(),
         background = palette.background,
+    )
+}
+
+/**
+ * 跟随宿主 Material 3 配色的主题（**嵌在 App 里时用这个**）。
+ *
+ * 排版与 [outsidePaperTheme] 一致（标题比 M3 默认小一档、行高 1.6、块间距收窄），
+ * 只是颜色全部取自当前 [MaterialTheme.colorScheme]，不画自己的背景 ——
+ * 这样 Markdown 段落不会在一片自定义纸面上显得突兀。
+ */
+@Composable
+public fun markdownMaterialTheme(): MarkdownTheme {
+    val scheme = MaterialTheme.colorScheme
+    val base = MaterialTheme.typography
+
+    fun style(
+        size: Int,
+        weight: FontWeight = FontWeight.Normal,
+        color: Color = scheme.onSurface,
+        italic: Boolean = false,
+    ): TextStyle = base.bodyMedium.copy(
+        fontSize = size.sp,
+        lineHeight = (size * 1.6f).sp,
+        fontWeight = weight,
+        color = color,
+        fontStyle = if (italic) FontStyle.Italic else FontStyle.Normal,
+    )
+
+    val body = style(15)
+
+    val colors = markdownColor(
+        text = scheme.onSurface,
+        codeBackground = scheme.surfaceContainerHigh,
+        inlineCodeBackground = scheme.secondaryContainer,
+        dividerColor = scheme.outlineVariant,
+        tableBackground = scheme.surfaceContainerLow,
+        darkTheme = scheme.background.luminance() < 0.5f,
+        highlightText = scheme.onSecondaryContainer,
+        highlightBackground = scheme.secondaryContainer,
+    )
+
+    val typography = markdownTypography(
+        h1 = style(24, FontWeight.Bold, scheme.primary),
+        h2 = style(20, FontWeight.SemiBold),
+        h3 = style(17, FontWeight.SemiBold),
+        h4 = style(16, FontWeight.Medium, scheme.tertiary),
+        h5 = style(15, FontWeight.Medium),
+        h6 = style(14, FontWeight.Medium, scheme.onSurfaceVariant),
+        text = body,
+        paragraph = body,
+        ordered = body,
+        bullet = body,
+        list = body,
+        quote = style(15),
+        code = style(13).copy(fontFamily = FontFamily.Monospace),
+        inlineCode = style(14, color = scheme.onSecondaryContainer).copy(fontFamily = FontFamily.Monospace),
+        table = body,
+        textLink = TextLinkStyles(
+            style = SpanStyle(color = scheme.primary, fontWeight = FontWeight.Medium),
+        ),
+        alertTitle = body.copy(fontWeight = FontWeight.SemiBold),
+    )
+
+    return MarkdownTheme(
+        colors = colors,
+        typography = typography,
+        dimens = markdownDimens(
+            dividerThickness = 1.dp,
+            codeBackgroundCornerSize = 8.dp,
+            blockQuoteThickness = 3.dp,
+            tableCornerSize = 6.dp,
+        ),
+        padding = markdownPadding(),
     )
 }

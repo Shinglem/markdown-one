@@ -44,11 +44,15 @@ kotlin {
             implementation("com.mikepenz:multiplatform-markdown-renderer:$vMikepenz")
             implementation("com.mikepenz:multiplatform-markdown-renderer-m3:$vMikepenz")
             implementation("com.mikepenz:multiplatform-markdown-renderer-code:$vMikepenz")
+            // 图片块：core 的默认实现只有一个占位色块，真正加载图片要靠 -coil3 模块
+            implementation("com.mikepenz:multiplatform-markdown-renderer-coil3:$vMikepenz")
 
             implementation("dev.snipme:highlights:$vHighlights")
 
             implementation("io.coil-kt.coil3:coil-compose:$vCoil")
             implementation("io.coil-kt.coil3:coil-svg:$vCoil")
+            // 徽章、远程插图都是 http(s) URL：没有 network fetcher 时 Coil 一律加载失败
+            implementation("io.coil-kt.coil3:coil-network-ktor3:$vCoil")
 
             // mermaid 纯 Kotlin 引擎（无 WebView），ADR 见 .design
             implementation("io.github.swithun-liu:mermaid-compose:$vMermaidCmp")
