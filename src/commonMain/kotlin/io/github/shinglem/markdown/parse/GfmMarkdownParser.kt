@@ -65,6 +65,16 @@ public class GfmMarkdownParser : MarkdownParser {
             MarkdownElementTypes.PARAGRAPH ->
                 mathBlock(key, text, rawText, node) ?: MdBlock.Paragraph(key, text, rawText, node)
 
+            // GFM 0.7.17 原生识别 `$$…$$`，比在段落层做文本判定可靠
+            GFMElementTypes.BLOCK_MATH -> MdBlock.Math(
+                key = key,
+                source = text,
+                raw = rawText,
+                node = node,
+                tex = rawText.trim().removeSurrounding("$$").trim(),
+                display = true,
+            )
+
             // 空白等无渲染意义的节点直接丢弃
             MarkdownTokenTypes.EOL, MarkdownTokenTypes.WHITE_SPACE -> null
 

@@ -103,7 +103,18 @@ markdown-one/
 ```bash
 ./gradlew :desktopTest   # 单元测试
 ./gradlew :demo:run      # sandbox
+
+# 指定启动时选中的 fixture（序号或名称）
+./gradlew :demo:run -Pfixture=0
+
+# 用 JBR with JCEF 跑（自动加 --add-modules jcef 等参数），验证 JCEF 回落
+./gradlew :demo:run -PjbrHome="C:\path\to\jbrsdk_jcef" -Pfixture=6
 ```
+
+demo 左侧是 fixture 列表，右侧「适配器路由」实时显示**每个块命中的适配器**，
+是这套架构最有效的自检工具。`复杂综合文档` 覆盖了标题（含 setext）、行内格式、
+嵌套列表与任务列表、表格、四种语言代码块、flowchart 与 sequence 图、公式、原始 HTML、
+嵌套引用、分割线与长段落。
 
 ## 扩展：接入你自己的适配器
 
@@ -160,6 +171,10 @@ MarkdownText(markdown, config = MarkdownConfig(adapters = listOf(MyMathAdapter()
 
 反射还有一条硬规矩：**方法一律从 `CefBrowser` 接口上取**，别用实现类 `CefBrowser_N` ——
 后者虽然是 `public`，在 jcef 模块里却不可访问，会抛 `IllegalAccessException`。
+
+还有一个只在长文档里才暴露的坑：`CefRenderHandler.getScreenInfo` **必须填充 `CefScreenInfo`
+并返回 `true`**。返回 `false` 时 CEF 认为该浏览器没有可用屏幕，`onPaint` 一帧都不会来，
+表现就是「占据了一块高度但永远空白」，日志里也没有任何报错。
 
 **仍然要自己处理的点**
 

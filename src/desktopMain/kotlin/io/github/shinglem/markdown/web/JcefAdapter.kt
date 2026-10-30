@@ -63,7 +63,17 @@ internal class JcefAdapter(private val config: MarkdownConfig) : BlockAdapter {
 
         var failure: String? by remember(block.key) { mutableStateOf(null) }
         var frame: ImageBitmap? by remember(block.key) { mutableStateOf(null) }
-        val engineRef = remember(block.key) { arrayOfNulls<CefEngine>(1) }
+        val slot = remember(block.key) {
+            CefSlot(
+                onFrame = { bitmap -> javax.swing.SwingUtilities.invokeLater { frame = bitmap } },
+                onError = { error ->
+                    javax.swing.SwingUtilities.invokeLater {
+                        failure = error.message ?: error::class.simpleName ?: "JCEF 初始化失败"
+                    }
+                    config.diagnostics.onFailure(id, block.key, error)
+                },
+            )
+        }
         val density = LocalDensity.current
 
         val message = failure
@@ -72,41 +82,17 @@ internal class JcefAdapter(private val config: MarkdownConfig) : BlockAdapter {
             return
         }
 
+        // 槽位只随块创建/销毁；尺寸与内容变化不影响引擎存活。
+        DisposableEffect(block.key) {
+            onDispose { slot.dispose() }
+        }
+
         BoxWithConstraints(modifier.fillMaxWidth().height(config.webFallbackHeight)) {
             val widthPx = with(density) { maxWidth.roundToPx() }
             val heightPx = with(density) { maxHeight.roundToPx() }
 
-            LaunchedEffect(widthPx, heightPx, html) {
-                val engine = engineRef[0]
-                if (engine == null) {
-                    // CEF 初始化会阻塞（轮询到 INITIALIZED），必须离开 Compose 主线程。
-                    // onPaint 在 CEF 线程回调，帧要排到 EDT（Compose Desktop 的主线程）再写状态。
-                    runCatching {
-                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                            CefEngine(
-                                onFrame = { bitmap -> javax.swing.SwingUtilities.invokeLater { frame = bitmap } },
-                                onError = { error -> config.diagnostics.onFailure(id, block.key, error) },
-                            )
-                        }.also {
-                            engineRef[0] = it
-                            it.resize(widthPx, heightPx)
-                            it.load(html)
-                        }
-                    }.onFailure { error ->
-                        failure = error.message ?: error::class.simpleName ?: "JCEF 初始化失败"
-                        config.diagnostics.onFailure(id, block.key, error)
-                    }
-                } else {
-                    engine.resize(widthPx, heightPx)
-                    engine.load(html)
-                }
-            }
-
-            DisposableEffect(block.key) {
-                onDispose {
-                    engineRef[0]?.dispose()
-                    engineRef[0] = null
-                }
+            LaunchedEffect(slot, widthPx, heightPx, html) {
+                slot.request(widthPx, heightPx, html)
             }
 
             val bitmap = frame

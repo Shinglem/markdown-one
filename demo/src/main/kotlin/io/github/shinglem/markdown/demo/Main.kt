@@ -41,6 +41,138 @@ private data class Fixture(val name: String, val markdown: String, val streaming
 
 private val FIXTURES = listOf(
     Fixture(
+        "复杂综合文档",
+        """
+        # 复杂文档渲染验证
+
+        > 这个 fixture 尽量覆盖每一种块类型，用来目视检查适配器链的整体效果。
+        > 右侧面板会列出每个块命中的适配器。
+
+        ## 一、文本与行内格式
+
+        普通段落：**粗体**、*斜体*、~~删除线~~、`行内代码`、[外部链接](https://example.com)，
+        以及中文与 English 混排，再加个 emoji ✅ 🚀。
+
+        ### 1.1 三级小节
+
+        Setext 标题
+        -----------
+
+        上面这行是 setext 写法的二级标题。
+
+        #### 1.1.1 四级标题
+
+        ##### 五级标题
+
+        ###### 六级标题
+
+        ## 二、列表
+
+        - 无序项一
+        - 无序项二
+          - 嵌套层级 A
+          - 嵌套层级 B
+            - 更深一层
+        - 无序项三
+
+        1. 有序一
+        2. 有序二
+           1. 嵌套有序
+           2. 嵌套有序
+
+        - [x] 已完成的任务
+        - [ ] 未完成的任务
+
+        ## 三、表格
+
+        | 语言 | 场景 | 体积 | 备注 |
+        | :--- | :--- | ---: | --- |
+        | Kotlin | 主力 | 小 | **推荐** |
+        | Rust | 高性能 | 中 | 需要 native |
+        | `JS` | 生态 | 大 | 不引入 |
+
+        ## 四、代码
+
+        ```kotlin
+        data class Adapter(
+            val id: String,
+            val priority: Int,
+        ) {
+            fun formats(): Set<String> = setOf("markdown", "code")
+        }
+        ```
+
+        ```json
+        {
+          "adapters": [
+            { "id": "builtin.jcef", "priority": 50, "kind": "Jcef" }
+          ],
+          "enabled": true
+        }
+        ```
+
+        ```bash
+        ./gradlew :desktopTest
+        git -c http.proxy=http://127.0.0.1:7890 push
+        ```
+
+        ```diff
+        - 旧实现：SwingPanel + heavyweight Canvas
+        + 新实现：OSR + BGRA → ImageBitmap
+        ```
+
+        ## 五、图表
+
+        ```mermaid
+        flowchart TD
+          A[输入 Markdown] --> B{解析}
+          B --> C[块序列]
+          C --> D{适配器路由}
+          D -->|Native| E[Compose 绘制]
+          D -->|Jcef| F[浏览器离屏]
+          D -->|都不行| G[源码兜底]
+        ```
+
+        ```mermaid
+        sequenceDiagram
+          participant U as 用户
+          participant C as 客户端
+          participant B as 后端
+          U->>C: prompt.submit
+          C->>B: JSON-RPC
+          B-->>C: event 流
+          C-->>U: 增量渲染
+        ```
+
+        ## 六、公式
+
+        $$
+        f(x) = \int_{-\infty}^{\infty} \hat{f}(\xi) e^{2\pi i \xi x} d\xi
+        $$
+
+        ## 七、原始 HTML
+
+        <div align="center">
+          <b>这段由 JCEF 渲染</b>；把 webFallback 改成 Source 就会显示源码。
+        </div>
+
+        ## 八、引用与分割线
+
+        > 一层引用
+        >
+        > > 嵌套引用
+
+        ---
+
+        ## 九、长段落
+
+        这是一段较长的中文，用来检查换行、行距与段落间距是否符合预期。渲染层把整篇文档解析成块序列，
+        再逐块交给适配器；每一块独立渲染，因此单块失败不会影响其它块。长段落在窄窗口下应当正常折行，
+        不应该出现横向滚动条，也不应该把字符裁掉。中文、English、数字 123 与符号 @#% 混排时，
+        断行位置应当由文本引擎决定，而不是按固定字宽估算。
+        """.trimIndent(),
+    ),
+    Fixture(
         "基础语法",
         """
         # 标题一
@@ -181,10 +313,17 @@ fun main() = application {
 
 @Composable
 private fun DemoScreen() {
-    val selected = remember { mutableStateOf(FIXTURES.first()) }
+    val initial = remember {
+        // -Ddemo.fixture 支持名称或序号（序号更安全，避免命令行中文编码问题）
+        val wanted = System.getProperty("demo.fixture")
+        FIXTURES.firstOrNull { it.name == wanted }
+            ?: wanted?.toIntOrNull()?.let { FIXTURES.getOrNull(it) }
+            ?: FIXTURES.first()
+    }
+    val selected = remember { mutableStateOf(initial) }
     val routes = remember { mutableStateMapOf<String, String>() }
     // 按 fixture 名分组：切 fixture 时不清空面板，靠前缀区分，避免「清了却不重填」。
-    val currentName = remember { mutableStateOf(FIXTURES.first().name) }
+    val currentName = remember { mutableStateOf(initial.name) }
 
     val config = remember {
         MarkdownConfig(

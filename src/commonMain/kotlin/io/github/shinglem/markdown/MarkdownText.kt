@@ -18,7 +18,6 @@ import com.mikepenz.markdown.compose.LocalMarkdownInlineContent
 import com.mikepenz.markdown.compose.LocalMarkdownPadding
 import com.mikepenz.markdown.compose.LocalMarkdownTypography
 import com.mikepenz.markdown.compose.LocalReferenceLinkHandler
-import com.mikepenz.markdown.compose.components.markdownComponents
 import com.mikepenz.markdown.m3.markdownColor
 import com.mikepenz.markdown.m3.markdownTypography
 import com.mikepenz.markdown.model.NoOpImageTransformerImpl
@@ -30,6 +29,7 @@ import com.mikepenz.markdown.model.markdownExtendedSpans
 import com.mikepenz.markdown.model.markdownInlineContent
 import com.mikepenz.markdown.model.markdownPadding
 import io.github.shinglem.markdown.adapter.LocalIsStreaming
+import io.github.shinglem.markdown.builtin.projectMarkdownComponents
 import io.github.shinglem.markdown.adapter.buildAdapterRegistry
 import io.github.shinglem.markdown.parse.GfmMarkdownParser
 
@@ -51,7 +51,7 @@ public fun MarkdownText(
 ) {
     val registry = remember(config) { buildAdapterRegistry(config) }
     val document = remember(markdown, streaming) { GfmMarkdownParser().parse(markdown, streaming) }
-    val components = remember { markdownComponents() }
+    val components = remember { projectMarkdownComponents() }
     val referenceLinks = remember { ReferenceLinkHandlerImpl() }
 
     CompositionLocalProvider(

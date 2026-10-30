@@ -38,5 +38,9 @@ compose.desktop {
                 "--add-opens", "java.desktop/java.awt.peer=ALL-UNNAMED",
             )
         }
+        // 启动时直接选中某个 fixture：-Pfixture="复杂综合文档"
+        providers.gradleProperty("fixture").orNull?.let {
+            jvmArgs += "-Ddemo.fixture=$it"
+        }
     }
 }
