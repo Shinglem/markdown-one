@@ -27,6 +27,13 @@ internal object CefRefs {
 
     val windowlessEnabled: Field by lazy { settingsClass.getField("windowless_rendering_enabled") }
     val noSandbox: Field by lazy { settingsClass.getField("no_sandbox") }
+    val browserSubprocessPath: Field by lazy { settingsClass.getField("browser_subprocess_path") }
+    val resourcesDirPath: Field by lazy { settingsClass.getField("resources_dir_path") }
+    val localesDirPath: Field by lazy { settingsClass.getField("locales_dir_path") }
+    val cachePath: Field by lazy { settingsClass.getField("cache_path") }
+
+    /** `CefApp.startup(String[])`：**不调它 CEF 永远不会初始化**（详见 [CefBootstrap]）。 */
+    val startup: Method by lazy { appClass.getMethod("startup", Array<String>::class.java) }
     val getInstance: Method by lazy { appClass.getMethod("getInstance", settingsClass) }
     val getState: Method by lazy { appClass.getMethod("getState") }
     val createClient: Method by lazy { appClass.getMethod("createClient") }
@@ -36,10 +43,16 @@ internal object CefRefs {
         osrClass.getConstructor(clientClass, String::class.java, requestContextClass, renderHandlerClass)
     }
 
+    /** OSR 浏览器是惰性创建的：不调它就没有渲染进程，也就没有 `onPaint`。 */
+    val createImmediately: Method by lazy { browserClass.getMethod("createImmediately") }
     val loadURL: Method by lazy { browserClass.getMethod("loadURL", String::class.java) }
+
+    /**
+     * 一律从 `CefBrowser` **接口**取方法，不要用实现类 `CefBrowser_N`：
+     * 后者虽然 `public`，但 JBR 的 jcef 模块不导出它的访问权（实测 `IllegalAccessException`）。
+     */
     val wasResized: Method by lazy {
-        Class.forName("org.cef.browser.CefBrowser_N", false, loader)
-            .getMethod("wasResized", Int::class.javaPrimitiveType, Int::class.javaPrimitiveType)
+        browserClass.getMethod("wasResized", Int::class.javaPrimitiveType, Int::class.javaPrimitiveType)
     }
     val setFocus: Method by lazy { browserClass.getMethod("setFocus", Boolean::class.javaPrimitiveType) }
     val close: Method by lazy { browserClass.getMethod("close", Boolean::class.javaPrimitiveType) }

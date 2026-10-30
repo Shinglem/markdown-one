@@ -23,7 +23,7 @@ Markdown 里塞得下代码、图表、公式、原始 HTML —— 它们的渲�
 ```
 MdBlock ──► AdapterRegistry
               ├── NativeAdapter (priority 100)  纯 Compose 绘制
-              ├── JcefAdapter   (priority  50)  内嵌浏览器离屏渲染（可选 artifact）
+              ├── JcefAdapter   (priority  50)  内嵌浏览器离屏渲染（反射接入，零编译期依赖）
               └── SourceFallback(priority   0)  源码 + 提示，永不留空白
 ```
 
@@ -71,7 +71,8 @@ MarkdownText(
 
 - `discoverAdapterFactories()` 是 `expect/actual`：JVM 用 `ServiceLoader`，
   其它端返回空列表（靠 `MarkdownConfig.adapters` 显式注册）。
-- `:jcef` 是 `kotlin("jvm")` 子项目，天然不参与其它 target。
+- JCEF 回落适配器在 `desktopMain` 里**全程反射**，对 `org.cef.*` 零编译期依赖，
+  因此在任何 JDK 上都能构建，其它 target 也不会看到它。
 
 `LRU` 缓存等 JVM 专有实现也集中在 `desktopMain`，加 target 时按平台各写一份。
 
@@ -81,8 +82,7 @@ MarkdownText(
 markdown-one/
 ├── build.gradle.kts        ← 核心库（KMP）
 ├── src/commonMain/         ← 模型 / 解析 / 适配器 SPI / 内置适配器
-├── src/desktopMain/        ← ServiceLoader 发现、平台实现
-├── jcef/                   ← 可选 artifact：JCEF 适配器（未实现）
+├── src/desktopMain/        ← ServiceLoader 发现、JCEF 反射适配器（web/）
 └── demo/                   ← Compose Desktop sandbox
 ```
 
@@ -137,22 +137,41 @@ MarkdownText(markdown, config = MarkdownConfig(adapters = listOf(MyMathAdapter()
 
 ### 用 JCEF 兜底原生画不出的内容
 
-库**不内置** JCEF 适配器，原因有两个：`jcef.jmod` 175 MB + `libcef.dll` 262 MB 不该由每个使用者背；
-是否带 Chromium 属于分发决策。需要时请自己实现，并注意：
+`WebFallback.Jcef` 打开后，`builtin.jcef` 会用 **JCEF 离屏渲染（OSR）** 把块画出来，
+再把 BGRA 帧交给 Skia。库对 `org.cef.*` **没有编译期依赖**（全程反射），
+所以普通 JDK 上照常构建，运行时找不到 `org.cef` 就自动退回 `builtin.source`。
 
-1. **运行时**：必须用 **JBR with JCEF**（或自备 CEF 运行时），启动参数加 `--add-modules jcef`。
-   标准 OpenJDK 上没有 `org.cef`，`isAvailable()` 要据此返回 false，让链路自动降级。
-2. **编译期**：`jcef.jmod` 不能直接进 classpath，需 `jmod extract` 出 classes 打成 jar 后
-   `compileOnly` 引入。
-3. **三个必须自己处理的点**（本设计原本要做的，也就是真正的难点）：
-   - **有界高度**：OSR 的 `CefRenderHandler.onPaint` 拿不到高度就不会绘制，
-     LazyColumn 里必须由内容回传 `scrollHeight` 再设 `Modifier.height(..)`；
-   - **实例池**：每个 `CefBrowser` 是独立 Chromium 渲染进程，一块一个会瞬间打爆内存；
-   - **网络白名单**：LLM 输出里的 `<img src="http://...">` 是追踪像素，必须在
-     `CefRequestHandler.onBeforeResourceLoad` 里拦掉，并关掉 `file_access` / `local_storage`。
+**运行时要求**
 
-参考：`AdapterKind.Jcef` 只是给诊断面板用的标签，不影响路由 —— 流式期间 kind 为 `Jcef`
-的适配器会被自动跳过，避免每帧重载浏览器内容。
+1. **JBR with JCEF**（或自备 CEF 运行时）；
+2. 启动参数 `--add-modules jcef --enable-native-access=jcef`
+   （后者是 JDK 24+ 加载 native 的许可，将来会强制）；
+   demo 传 `-PjbrHome=<JBR 路径>` 会自动带上。
+
+**JBR 上把 CEF 拉起来要做的四件事**（[CefBootstrap.kt](src/desktopMain/kotlin/io/github/shinglem/markdown/web/CefBootstrap.kt) 里都做了，
+列出来是因为每一条都对应一次「什么都没发生」的静默失败）：
+
+| 步骤 | 不做的后果 |
+|---|---|
+| `CefApp.startup(new String[0])` **必须先于** `getInstance` | `getState()` 永远停在 `NEW`。JBR 的 `getInstance` 只是把初始化挂在一个内部 future 上，**只有 `startup` 才会完成它**；CEF 自己的 native 日志也不会生成。 |
+| `settings.browser_subprocess_path` 指向 `<java.home>/bin/jcef_helper.exe` | CEF 把 `--type=gpu-process` 传给 `java.exe`，子进程报 `Unrecognized option` 后退出，GPU/网络进程全崩。 |
+| `settings.cache_path` 按进程隔离 | 两个进程共用默认 user data 目录时，后启动的会连到已有实例（日志：`Opening in existing browser session.`）并卡在 `NEW`。 |
+| `browser.createImmediately()` | OSR 浏览器是惰性创建的，不调就没有渲染进程，`onPaint` 永远不来。 |
+
+反射还有一条硬规矩：**方法一律从 `CefBrowser` 接口上取**，别用实现类 `CefBrowser_N` ——
+后者虽然是 `public`，在 jcef 模块里却不可访问，会抛 `IllegalAccessException`。
+
+**仍然要自己处理的点**
+
+- **有界高度**：OSR 先有尺寸才出帧，适配器按 `MarkdownConfig.webFallbackHeight` 定高，
+  内容在页面内滚动；
+- **实例池**：每个 `CefBrowser` 是独立的渲染进程，长文档里一块一个会吃很多内存；
+  用 `webDocument` 收窄回落范围，而不是把整个文档都交给浏览器；
+- **网络白名单**：LLM 输出里的 `<img src="http://...">` 是追踪像素，需要自己拦
+  （本库尚未内置请求拦截）。
+
+`AdapterKind.Jcef` 同时是诊断面板上的标签：流式期间 kind 为 `Jcef` 的适配器会被跳过，
+避免每帧重载 Chromium。
 
 ## 许可证
 

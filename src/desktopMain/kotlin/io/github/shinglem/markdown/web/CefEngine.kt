@@ -32,32 +32,7 @@ internal class CefEngine(
     private val browser: Any
 
     init {
-        val settings = CefRefs.settingsClass.getDeclaredConstructor().newInstance()
-        CefRefs.windowlessEnabled.setBoolean(settings, true)
-        // 从非标准安装路径/开发环境启动时，CEF 沙箱常常起不来。
-        runCatching { CefRefs.noSandbox.setBoolean(settings, true) }
-        runCatching {
-            val logFile = java.io.File(System.getProperty("java.io.tmpdir"), "markdown-one-cef.log")
-            CefRefs.settingsClass.getField("log_file").set(settings, logFile.absolutePath)
-            val severity = Class.forName("org.cef.CefSettings\$LogSeverity", false, CefRefs.settingsClass.classLoader)
-                .enumConstants
-                ?.firstOrNull { (it as Enum<*>).name.contains("INFO") }
-            if (severity != null) CefRefs.settingsClass.getField("log_severity").set(settings, severity)
-        }
-
-        // JCEF 要求初始化发生在 AWT EDT 上，否则 getState() 会一直停在 INITIALIZING。
-        var app: Any? = null
-        var initError: Throwable? = null
-        javax.swing.SwingUtilities.invokeAndWait {
-            runCatching {
-                app = CefRefs.getInstance.invoke(null, settings)
-            }.onFailure { initError = it }
-        }
-        initError?.let { throw it }
-        app ?: error("CefApp.getInstance 返回 null")
-
-        // CEF 初始化是异步的：getGlobalContext() 在 INITIALIZING 阶段会返回 null。
-        awaitInitialized()
+        val app = CefBootstrap.app()
 
         client = CefRefs.createClient.invoke(app)
             ?: error("CefApp.createClient 返回 null")
@@ -68,6 +43,8 @@ internal class CefEngine(
         browser = CefRefs.osrCtor.newInstance(client, "about:blank", requestContext, newRenderHandler())
             ?: error("CefBrowserOsrWithHandler 构造返回 null")
 
+        // OSR 浏览器惰性创建：不显式创建就没有渲染进程，onPaint 永远不会来（实测）。
+        runCatching { CefRefs.createImmediately.invoke(browser) }
         CefRefs.wasResized.invoke(browser, viewWidth, viewHeight)
     }
 
@@ -84,21 +61,7 @@ internal class CefEngine(
         runCatching { CefRefs.loadURL.invoke(browser, "data:text/html;base64,$encoded") }
     }
 
-    /** 轮询 `CefApp.getState()` 直到 INITIALIZED（CEF 初始化是异步的）。 */
-    private fun awaitInitialized(timeoutMs: Long = 15_000) {
-        val deadline = System.currentTimeMillis() + timeoutMs
-        var lastState: String? = null
-        while (System.currentTimeMillis() < deadline) {
-            lastState = runCatching { CefRefs.getState.invoke(null)?.toString() }.getOrNull()
-            when (lastState) {
-                "INITIALIZED" -> return
-                "TERMINATED", "SHUTTING_DOWN" -> error("CEF 已终止（$lastState）")
-            }
-            Thread.sleep(50)
-        }
-        error("CEF 初始化超时（${timeoutMs}ms），最后状态=$lastState")
-    }
-
+    /** 关闭本引擎的浏览器与 client；`CefApp` 是全局单例，不能在这里关。 */
     fun dispose() {
         runCatching { CefRefs.close.invoke(browser, true) }
         runCatching { CefRefs.dispose.invoke(client) }

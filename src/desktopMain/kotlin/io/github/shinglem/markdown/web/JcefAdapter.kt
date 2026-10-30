@@ -80,9 +80,10 @@ internal class JcefAdapter(private val config: MarkdownConfig) : BlockAdapter {
                 val engine = engineRef[0]
                 if (engine == null) {
                     // CEF 初始化会阻塞（轮询到 INITIALIZED），必须离开 Compose 主线程。
+                    // onPaint 在 CEF 线程回调，帧要排到 EDT（Compose Desktop 的主线程）再写状态。
                     runCatching {
                         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                            CefEngine { bitmap -> frame = bitmap }
+                            CefEngine { bitmap -> javax.swing.SwingUtilities.invokeLater { frame = bitmap } }
                         }.also {
                             engineRef[0] = it
                             it.resize(widthPx, heightPx)
