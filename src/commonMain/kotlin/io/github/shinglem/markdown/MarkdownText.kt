@@ -11,6 +11,8 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextAlign
 import com.mikepenz.markdown.compose.LocalImageTransformer
 import com.mikepenz.markdown.compose.LocalMarkdownAnimations
 import com.mikepenz.markdown.compose.LocalMarkdownAnnotator
@@ -25,6 +27,7 @@ import com.mikepenz.markdown.compose.LocalMarkdownTypography
 import com.mikepenz.markdown.compose.LocalReferenceLinkHandler
 import com.mikepenz.markdown.m3.markdownColor
 import com.mikepenz.markdown.m3.markdownTypography
+import com.mikepenz.markdown.model.MarkdownTypography
 import com.mikepenz.markdown.model.ReferenceLinkHandlerImpl
 import com.mikepenz.markdown.model.markdownAnimations
 import com.mikepenz.markdown.model.markdownAnnotator
@@ -52,14 +55,17 @@ public fun MarkdownText(
     modifier: Modifier = Modifier,
     streaming: Boolean = false,
     config: MarkdownConfig = MarkdownConfig(),
+    textAlign: TextAlign? = null,
+    fillWidth: Boolean = true,
 ) {
     val registry = remember(config) { buildAdapterRegistry(config) }
     val document = remember(markdown, streaming) { GfmMarkdownParser().parse(markdown, streaming) }
     val components = remember { projectMarkdownComponents() }
     val referenceLinks = remember { ReferenceLinkHandlerImpl() }
 
-    // 行内公式：先把整篇里出现的 `$…$` 收集成表，annotator 里按 key 命中同一条。
-    val inlineTexes = remember(markdown) { collectInlineTexes(markdown) }
+    // 行内公式：先从 AST 收集整篇出现过的 tex 建表，annotator 里按 key 命中同一条。
+    val source = document.blocks.firstOrNull()?.source ?: markdown
+    val inlineTexes = remember(document.blocks) { collectInlineTexes(document.blocks, source) }
     val mathContents = mathInlineContents(inlineTexes)
     val annotator = rememberMathAnnotator(mathContents)
     val inlineContent = markdownInlineContent(mathContents)
@@ -67,7 +73,10 @@ public fun MarkdownText(
     // 主题可在运行时切换（明暗），所以逐个取 CompositionLocal 当前值，而不是写死默认。
     val theme = config.theme
     val colors = theme?.colors ?: markdownColor()
-    val typography = theme?.typography ?: markdownTypography()
+    val baseTypography = theme?.typography ?: markdownTypography()
+    val typography = remember(baseTypography, textAlign) {
+        if (textAlign == null) baseTypography else alignedTypography(baseTypography, textAlign)
+    }
     val dimens = theme?.dimens ?: markdownDimens()
     val padding = theme?.padding ?: markdownPadding()
 
@@ -90,7 +99,7 @@ public fun MarkdownText(
             LocalMarkdownComponents provides components,
             LocalMarkdownAnimations provides markdownAnimations(),
         ) {
-            Column(Modifier.fillMaxWidth()) {
+            Column(if (fillWidth) Modifier.fillMaxWidth() else Modifier) {
                 document.blocks.forEach { block ->
                     val adapter = registry.select(block, streaming)
                     if (adapter != null) {
@@ -100,7 +109,7 @@ public fun MarkdownText(
                         }
                         key(block.key) {
                             val content: @Composable () -> Unit = {
-                                adapter.Render(block, Modifier.fillMaxWidth())
+                                adapter.Render(block, if (fillWidth) Modifier.fillMaxWidth() else Modifier)
                             }
                             val needsViewport = config.viewport.enabled &&
                                 config.viewport.matches(block.formats.map { it.value }.toSet())
@@ -115,4 +124,29 @@ public fun MarkdownText(
             }
         }
     }
+}
+
+/**
+ * 只改水平对齐的 [MarkdownTypography]；其余字段原样委托给当前主题。
+ *
+ * 用 typography 而不是布局约束来做居中：mikepenz 的段落是整宽 `Text`，
+ * 外层 `Box` 怎么对齐都不影响里面的文字与行内图片。
+ */
+private fun alignedTypography(base: MarkdownTypography, align: TextAlign): MarkdownTypography =
+    AlignedTypography(base, align)
+
+private class AlignedTypography(
+    private val base: MarkdownTypography,
+    private val align: TextAlign,
+) : MarkdownTypography by base {
+    private fun TextStyle.aligned(): TextStyle = copy(textAlign = align)
+
+    override val text: TextStyle get() = base.text.aligned()
+    override val paragraph: TextStyle get() = base.paragraph.aligned()
+    override val h1: TextStyle get() = base.h1.aligned()
+    override val h2: TextStyle get() = base.h2.aligned()
+    override val h3: TextStyle get() = base.h3.aligned()
+    override val h4: TextStyle get() = base.h4.aligned()
+    override val h5: TextStyle get() = base.h5.aligned()
+    override val h6: TextStyle get() = base.h6.aligned()
 }

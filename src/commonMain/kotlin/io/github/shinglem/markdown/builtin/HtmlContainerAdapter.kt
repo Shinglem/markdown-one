@@ -1,13 +1,13 @@
 package io.github.shinglem.markdown.builtin
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
-import com.mikepenz.markdown.compose.LocalMarkdownTypography
-import com.mikepenz.markdown.model.MarkdownTypography
 import io.github.shinglem.markdown.MarkdownConfig
 import io.github.shinglem.markdown.MarkdownText
 import io.github.shinglem.markdown.adapter.AdapterKind
@@ -45,18 +45,26 @@ internal class HtmlContainerAdapter(private val config: MarkdownConfig) : BlockA
 
         val align = remember(raw) {
             ALIGN.find(raw)?.let { match ->
-                if (match.groupValues[1].equals("right", ignoreCase = true)) TextAlign.End else TextAlign.Center
+                if (match.groupValues[1].equals("right", ignoreCase = true)) {
+                    Alignment.TopEnd to TextAlign.End
+                } else {
+                    Alignment.TopCenter to TextAlign.Center
+                }
             }
         }
         if (align == null) {
             MarkdownText(markdown = inner, config = config, modifier = modifier)
-            return
-        }
-
-        val typography = LocalMarkdownTypography.current
-        val aligned = remember(typography, align) { AlignedTypography(typography, align) }
-        CompositionLocalProvider(LocalMarkdownTypography provides aligned) {
-            MarkdownText(markdown = inner, config = config, modifier = modifier)
+        } else {
+            // 两层都要：外层 Box 让整块贴着容器中/右，内层 textAlign 让多行文字各自居中。
+            Box(modifier.fillMaxWidth(), contentAlignment = align.first) {
+                MarkdownText(
+                    markdown = inner,
+                    config = config,
+                    modifier = Modifier.wrapContentWidth(),
+                    textAlign = align.second,
+                    fillWidth = false,
+                )
+            }
         }
     }
 
@@ -85,21 +93,4 @@ internal class HtmlContainerAdapter(private val config: MarkdownConfig) : BlockA
         )
         val TAG_ONLY = Regex("""^(?:\s*</?[a-zA-Z][\w-]*[^>]*>)+\s*$""")
     }
-}
-
-/** 只改水平对齐的 [MarkdownTypography]；其余字段原样委托给当前主题。 */
-private class AlignedTypography(
-    private val base: MarkdownTypography,
-    private val align: TextAlign,
-) : MarkdownTypography by base {
-    private fun TextStyle.aligned(): TextStyle = copy(textAlign = align)
-
-    override val text: TextStyle get() = base.text.aligned()
-    override val paragraph: TextStyle get() = base.paragraph.aligned()
-    override val h1: TextStyle get() = base.h1.aligned()
-    override val h2: TextStyle get() = base.h2.aligned()
-    override val h3: TextStyle get() = base.h3.aligned()
-    override val h4: TextStyle get() = base.h4.aligned()
-    override val h5: TextStyle get() = base.h5.aligned()
-    override val h6: TextStyle get() = base.h6.aligned()
 }

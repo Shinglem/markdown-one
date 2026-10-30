@@ -8,8 +8,8 @@ package io.github.shinglem.markdown.parse
  * 包进一个带样式的节点；而改写源码后重新解析，样式、行内代码、图片全都走正常路径。
  *
  * 规则刻意保守：
- * - 只处理白名单标签（见 [TAG_MARKERS]），其它标签（`<div>`/`<details>`/`<span>`…）原样保留，
- *   由块级适配器或兜底显示接手，避免误吃正文里的 `a<b>c` 之类的比较符；
+ * - 成对标签（`<b>`…`</b>`）才改写，单边标签原样保留 —— 正文里的 `a<b>c` 这类比较符不会被吃掉；
+ * - 其它标签（`<div>`/`<details>`/`<span>`…）不在这里处理，交给块级适配器或源码兜底；
  * - ` ``` ` / `~~~` 围栏代码块与行内代码里的内容一律不动；
  * - `<br>` 变成硬换行（行尾两个空格 + 换行），`<img>` 变成 `![alt](src)`，`<a href>` 变成链接。
  */
@@ -71,7 +71,7 @@ private fun rewriteTags(text: String): String {
     }
     result = BREAK.replace(result, "  \n")
     for ((regex, marker) in TAG_MARKERS) {
-        result = regex.replace(result, marker)
+        result = regex.replace(result) { match -> marker + match.groupValues[2] + marker }
     }
     return result
 }
@@ -87,10 +87,16 @@ private val LINK = Regex(
     setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL),
 )
 
-/** 标签 → Markdown 标记。开闭标签替换成同一个标记（`<b>x</b>` → `**x**`）。 */
+private val PAIRED = setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL)
+
+/**
+ * 成对标签 → Markdown 标记。**必须成对**才替换：正文里 `a<b>c` 这样的比较符
+ * 没有闭合标签，保持原样比吃掉更安全。
+ */
 private val TAG_MARKERS: List<Pair<Regex, String>> = listOf(
-    Regex("""</?(?:b|strong)\s*>""", RegexOption.IGNORE_CASE) to "**",
-    Regex("""</?(?:i|em)\s*>""", RegexOption.IGNORE_CASE) to "*",
-    Regex("""</?(?:del|s|strike)\s*>""", RegexOption.IGNORE_CASE) to "~~",
-    Regex("""</?code\s*>""", RegexOption.IGNORE_CASE) to "`",
+    Regex("""<(b|strong)\s*>(.*?)</\1\s*>""", PAIRED) to "**",
+    Regex("""<(i|em)\s*>(.*?)</\1\s*>""", PAIRED) to "*",
+    Regex("""<(del|s|strike)\s*>(.*?)</\1\s*>""", PAIRED) to "~~",
+    Regex("""<(code)\s*>(.*?)</\1\s*>""", PAIRED) to "`",
 )
+
