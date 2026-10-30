@@ -2,12 +2,14 @@ package io.github.shinglem.markdown
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -51,6 +53,8 @@ public data class BlockViewportConfig(
     public val maxHeight: Dp = 420.dp,
     /** 是否显示缩放控件。 */
     public val zoomable: Boolean = true,
+    /** 每块的初始缩放；必须在 [zoomLevels] 里（或与之相同）才会被档位按钮识别。 */
+    public val initialZoom: Float = 1f,
     /** 固定档位，避免连续加减时的浮点累积（100% 变 78% 那种）。 */
     public val zoomLevels: List<Float> = listOf(
         0.4f, 0.5f, 0.6f, 0.7f, 0.8f, 0.9f, 1.0f, 1.1f, 1.25f, 1.5f, 2.0f, 2.5f,
@@ -73,17 +77,18 @@ internal fun BlockViewport(
     config: BlockViewportConfig,
     content: @Composable () -> Unit,
 ) {
-    var zoom by remember { mutableStateOf(1f) }
+    var zoom by remember { mutableStateOf(config.initialZoom) }
     var contentHeight by remember { mutableStateOf(0) }
     var contentWidth by remember { mutableStateOf(0) }
     var boxWidth by remember { mutableStateOf(0) }
+    var boxHeight by remember { mutableStateOf(0) }
     val density = LocalDensity.current
 
     val maxHeightPx = with(density) {
         if (config.maxHeight == Dp.Unspecified) Int.MAX_VALUE else config.maxHeight.roundToPx()
     }
     val overflowVertical = contentHeight > maxHeightPx
-    val overflowHorizontal = (contentWidth * zoom).roundToInt() > boxWidth && boxWidth > 0
+    val overflowHorizontal = contentWidth > boxWidth && boxWidth > 0
 
     val vScroll = rememberScrollState()
     val hScroll = rememberScrollState()
@@ -91,7 +96,10 @@ internal fun BlockViewport(
     Box(
         Modifier
             .fillMaxWidth()
-            .onSizeChanged { boxWidth = it.width },
+            .onSizeChanged {
+                boxWidth = it.width
+                boxHeight = it.height
+            },
     ) {
         BoxWithConstraints(Modifier.fillMaxWidth()) {
             // 显式给内容一个**有限宽度**：横向滚动容器会给子项无限宽，
@@ -108,17 +116,43 @@ internal fun BlockViewport(
                 Row(Modifier.horizontalScroll(hScroll)) {
                     Box(
                         Modifier
-                            .width(availableWidth)
-                            .scaleLayout(zoom)
                             .onSizeChanged {
                                 contentWidth = it.width
                                 contentHeight = it.height
-                            },
+                            }
+                            .scaleLayout(zoom)
+                            .width(availableWidth),
                     ) {
                         content()
                     }
                 }
             }
+        }
+
+        // 滚动条：叠加在内容之上，不改原有布局嵌套。
+        // 尺寸必须显式给出：`fillMaxHeight()` 在 verticalScroll 里会退化成 Int.MAX_VALUE，
+        // Skia 会直接拒绝（报 `Size(10 x 2147483647) is out of range`）。
+        if (overflowVertical) {
+            BlockScrollbarOverlay(
+                vScroll = vScroll,
+                hScroll = hScroll,
+                vertical = true,
+                horizontal = false,
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .height(with(density) { boxHeight.toDp() }),
+            )
+        }
+        if (overflowHorizontal) {
+            BlockScrollbarOverlay(
+                vScroll = vScroll,
+                hScroll = hScroll,
+                vertical = false,
+                horizontal = true,
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .width(with(density) { boxWidth.toDp() }),
+            )
         }
 
         if (config.zoomable && (overflowVertical || overflowHorizontal || zoom != 1f)) {
@@ -132,11 +166,23 @@ internal fun BlockViewport(
                 onZoomIn = { zoom = config.zoomLevels[(index + 1).coerceAtMost(config.zoomLevels.lastIndex)] },
                 onZoomOut = { zoom = config.zoomLevels[(index - 1).coerceAtLeast(0)] },
                 onReset = { zoom = 1f },
-                modifier = Modifier.align(Alignment.TopEnd).padding(4.dp),
-            )
+                modifier = Modifier.align(Alignment.TopEnd).padding(4.dp),            )
         }
     }
 }
+
+/**
+ * 滚动条叠加层。桌面端用原生 [androidx.compose.foundation.VerticalScrollbar]，
+ * 其它平台不画（触屏/触控板本来就不依赖滚动条）。
+ */
+@Composable
+internal expect fun BlockScrollbarOverlay(
+    vScroll: ScrollState,
+    hScroll: ScrollState,
+    vertical: Boolean,
+    horizontal: Boolean,
+    modifier: Modifier,
+)
 
 /**
  * 缩放后的**布局尺寸**跟着变。
