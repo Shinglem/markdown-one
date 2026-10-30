@@ -65,8 +65,11 @@ internal class CefEngine(
 
     /** 关闭本引擎的浏览器与 client；`CefApp` 是全局单例，不能在这里关。 */
     fun dispose() {
-        runCatching { CefRefs.close.invoke(browser, true) }
-        runCatching { CefRefs.dispose.invoke(client) }
+        // `close` / `dispose` 内部会等 CEF 的 UI 线程，直接在主线程调会把窗口卡死（实测：窗口不出）。
+        Thread({
+            runCatching { CefRefs.close.invoke(browser, true) }
+            runCatching { CefRefs.dispose.invoke(client) }
+        }, "markdown-one-cef-dispose").apply { isDaemon = true }.start()
     }
 
     /** `CefRenderHandler` 的动态实现：只关心 `getViewRect` / `getScreenInfo` / `onPaint`。 */

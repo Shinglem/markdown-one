@@ -5,8 +5,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import com.mikepenz.markdown.compose.LocalMarkdownComponents
+import com.mikepenz.markdown.compose.LocalMarkdownTypography
 import com.mikepenz.markdown.compose.components.MarkdownComponentModel
-import com.mikepenz.markdown.m3.markdownTypography
 import io.github.shinglem.markdown.MarkdownConfig
 import io.github.shinglem.markdown.adapter.AdapterKind
 import io.github.shinglem.markdown.adapter.BlockAdapter
@@ -49,7 +49,7 @@ internal class MarkdownBlockAdapter(@Suppress("unused") private val config: Mark
         val model = MarkdownComponentModel(
             content = block.source,
             node = block.node,
-            typography = markdownTypography(),
+            typography = LocalMarkdownTypography.current,
         )
         // element 自身不接受 modifier，用 Box 承载调用方的尺寸约束。
         Box(modifier) {

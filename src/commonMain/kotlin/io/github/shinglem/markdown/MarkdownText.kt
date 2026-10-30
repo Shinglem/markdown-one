@@ -1,12 +1,16 @@
 package io.github.shinglem.markdown
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import com.mikepenz.markdown.compose.LocalImageTransformer
 import com.mikepenz.markdown.compose.LocalMarkdownAnimations
 import com.mikepenz.markdown.compose.LocalMarkdownAnnotator
@@ -54,30 +58,52 @@ public fun MarkdownText(
     val components = remember { projectMarkdownComponents() }
     val referenceLinks = remember { ReferenceLinkHandlerImpl() }
 
-    CompositionLocalProvider(
-        LocalIsStreaming provides streaming,
-        LocalReferenceLinkHandler provides referenceLinks,
-        LocalMarkdownColors provides markdownColor(),
-        LocalMarkdownTypography provides markdownTypography(),
-        LocalMarkdownDimens provides markdownDimens(),
-        LocalMarkdownPadding provides markdownPadding(),
-        LocalImageTransformer provides NoOpImageTransformerImpl(),
-        LocalMarkdownAnnotator provides markdownAnnotator(),
-        LocalMarkdownExtendedSpans provides markdownExtendedSpans(),
-        LocalMarkdownInlineContent provides markdownInlineContent(),
-        LocalMarkdownComponents provides components,
-        LocalMarkdownAnimations provides markdownAnimations(),
-    ) {
-        Column(modifier = modifier) {
-            document.blocks.forEach { block ->
-                val adapter = registry.select(block, streaming)
-                if (adapter != null) {
-                    // 用块内容参与 key：切到另一个文档时块 key 仍是 b0/b1，只按 key 去重会漏报。
-                    androidx.compose.runtime.LaunchedEffect(block.key, block.raw, adapter.id) {
-                        config.diagnostics.onRoute(block.key, block.formats, adapter.id, adapter.kind)
-                    }
-                    key(block.key) {
-                        adapter.Render(block, Modifier.fillMaxWidth())
+    // 主题可在运行时切换（明暗），所以逐个取 CompositionLocal 当前值，而不是写死默认。
+    val theme = config.theme
+    val colors = theme?.colors ?: markdownColor()
+    val typography = theme?.typography ?: markdownTypography()
+    val dimens = theme?.dimens ?: markdownDimens()
+    val padding = theme?.padding ?: markdownPadding()
+
+    Box(modifier = if (theme?.background != Color.Unspecified && theme != null) {
+        modifier.background(theme.background)
+    } else {
+        modifier
+    }) {
+        CompositionLocalProvider(
+            LocalIsStreaming provides streaming,
+            LocalReferenceLinkHandler provides referenceLinks,
+            LocalMarkdownColors provides colors,
+            LocalMarkdownTypography provides typography,
+            LocalMarkdownDimens provides dimens,
+            LocalMarkdownPadding provides padding,
+            LocalImageTransformer provides NoOpImageTransformerImpl(),
+            LocalMarkdownAnnotator provides markdownAnnotator(),
+            LocalMarkdownExtendedSpans provides markdownExtendedSpans(),
+            LocalMarkdownInlineContent provides markdownInlineContent(),
+            LocalMarkdownComponents provides components,
+            LocalMarkdownAnimations provides markdownAnimations(),
+        ) {
+            Column(Modifier.fillMaxWidth()) {
+                document.blocks.forEach { block ->
+                    val adapter = registry.select(block, streaming)
+                    if (adapter != null) {
+                        // 用块内容参与 key：切到另一个文档时块 key 仍是 b0/b1，只按 key 去重会漏报。
+                        LaunchedEffect(block.key, block.raw, adapter.id) {
+                            config.diagnostics.onRoute(block.key, block.formats, adapter.id, adapter.kind)
+                        }
+                        key(block.key) {
+                            val content: @Composable () -> Unit = {
+                                adapter.Render(block, Modifier.fillMaxWidth())
+                            }
+                            val needsViewport = config.viewport.enabled &&
+                                config.viewport.matches(block.formats.map { it.value }.toSet())
+                            if (needsViewport) {
+                                BlockViewport(config.viewport, content)
+                            } else {
+                                content()
+                            }
+                        }
                     }
                 }
             }

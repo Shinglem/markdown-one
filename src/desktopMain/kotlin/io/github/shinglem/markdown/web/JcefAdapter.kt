@@ -17,7 +17,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import io.github.shinglem.markdown.MarkdownConfig
@@ -75,6 +78,32 @@ internal class JcefAdapter(private val config: MarkdownConfig) : BlockAdapter {
             )
         }
         val density = LocalDensity.current
+        val windowHeight = LocalWindowInfo.current.containerSize.height
+
+        // 池位：数量受限，池满时排队（先到先得，不抢占）。
+        val granted = JcefPool.isActive(block.key)
+        val poolVersion = JcefPool.version
+        // 初值 true：先申请（文档顺序靠前的块优先），之后靠 onGloballyPositioned 纠正。
+        // 初值给 false 的话，若窗口尺寸拿不到（containerSize 可能为 0），一个块都申请不到。
+        var visible by remember(block.key) { mutableStateOf(true) }
+
+        LaunchedEffect(granted, visible, block.key, poolVersion) {
+            JcefPool.capacity = config.jcefPoolSize
+            if (visible) {
+                JcefPool.acquire(block.key)
+            } else if (granted) {
+                // 滚出视口就还回去，让排队中的块有机会拿到。
+                JcefPool.release(block.key)
+            }
+        }
+
+        // 失去池位就临时释放浏览器（Chromium 进程），重新拿到时下面的 request 会重建。
+        LaunchedEffect(granted) {
+            if (!granted) {
+                slot.releaseEngine()
+                frame = null
+            }
+        }
 
         val message = failure
         if (message != null) {
@@ -84,12 +113,34 @@ internal class JcefAdapter(private val config: MarkdownConfig) : BlockAdapter {
 
         // 槽位只随块创建/销毁；尺寸与内容变化不影响引擎存活。
         DisposableEffect(block.key) {
-            onDispose { slot.dispose() }
+            onDispose {
+                slot.dispose()
+                JcefPool.release(block.key)
+            }
         }
 
-        BoxWithConstraints(modifier.fillMaxWidth().height(config.webFallbackHeight)) {
+        BoxWithConstraints(
+            modifier
+                .fillMaxWidth()
+                .height(config.webFallbackHeight)
+                .onGloballyPositioned { coords ->
+                    if (windowHeight <= 0) return@onGloballyPositioned
+                    val bounds = coords.boundsInWindow()
+                    val nowVisible = bounds.bottom > 0 && bounds.top < windowHeight
+                    if (nowVisible != visible) visible = nowVisible
+                },
+        ) {
             val widthPx = with(density) { maxWidth.roundToPx() }
             val heightPx = with(density) { maxHeight.roundToPx() }
+
+            if (!granted) {
+                Text(
+                    text = "等待浏览器实例（池上限 ${config.jcefPoolSize}）",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                return@BoxWithConstraints
+            }
 
             LaunchedEffect(slot, widthPx, heightPx, html) {
                 slot.request(widthPx, heightPx, html)

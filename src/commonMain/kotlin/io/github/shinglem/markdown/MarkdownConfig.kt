@@ -24,13 +24,18 @@ public data class MarkdownConfig(
     public val webFallback: WebFallback = WebFallback.Source,
     /** 回落渲染的高度（浏览器内容在内部滚动）。 */
     public val webFallbackHeight: Dp = 320.dp,
-    /**
-     * 为某个块生成交给浏览器渲染的 HTML 文档；返回 null 表示这个块不走回落渲染。
+    /** 为某个块生成交给浏览器渲染的 HTML 文档；返回 null 表示这个块不走回落渲染。
      *
      * 默认只处理「原始 HTML 块」（且需 [allowRawHtml]）。数学公式与图表需要 KaTeX / mermaid.js
      * 之类的脚本资源，由调用方在这里注入（库不打包脚本，保持零体积）。
      */
     public val webDocument: ((MdBlock) -> String?)? = null,
+    /** 整体外观；null 表示沿用 Material 3 默认（[outsidePaperTheme] 是内置的纸面风格）。 */
+    public val theme: MarkdownTheme? = null,
+    /** 大块的限高滚动与缩放。 */
+    public val viewport: BlockViewportConfig = BlockViewportConfig(),
+    /** 同时存活的浏览器实例上限（每实例是一个 Chromium 渲染进程）。 */
+    public val jcefPoolSize: Int = 2,
     /** 图表画不出时的提示文案。 */
     public val mermaidFallbackText: String = "图表语法暂不支持，已显示源码",
     /** 超过这个长度的代码块跳过同步着色（大块同步着色会卡 UI）。 */

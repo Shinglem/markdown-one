@@ -14,12 +14,14 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.VerticalDivider
+import androidx.compose.foundation.layout.Box
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
@@ -29,7 +31,10 @@ import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import io.github.shinglem.markdown.MarkdownConfig
 import io.github.shinglem.markdown.MarkdownText
+import io.github.shinglem.markdown.OutsidePaper
+import io.github.shinglem.markdown.OutsidePaperDark
 import io.github.shinglem.markdown.WebFallback
+import io.github.shinglem.markdown.outsidePaperTheme
 import io.github.shinglem.markdown.adapter.AdapterDiagnostics
 import io.github.shinglem.markdown.adapter.AdapterKind
 import io.github.shinglem.markdown.adapter.BlockAdapter
@@ -245,6 +250,29 @@ private val FIXTURES = listOf(
         streaming = true,
     ),
     Fixture(
+        "多个 HTML 块（池上限 2）",
+        """
+        # 浏览器实例池
+
+        下面有 4 个 HTML 块，但池上限是 2 —— 滚动时应看到「等待浏览器实例」的占位，
+        滚回上方时重新分配。每个块一个 Chromium 进程会把内存吃光。
+
+        <div align="center" style="font-size:28px">① 第一块</div>
+
+        中间隔一段文字，把块拉开距离。
+
+        <div align="center" style="font-size:28px">② 第二块</div>
+
+        再隔一段文字。
+
+        <div align="center" style="font-size:28px">③ 第三块</div>
+
+        最后一段。
+
+        <div align="center" style="font-size:28px">④ 第四块</div>
+        """.trimIndent(),
+    ),
+    Fixture(
         "原始 HTML 与公式",
         """
         <div align="center">一段原始 HTML</div>
@@ -303,11 +331,7 @@ fun main() = application {
         title = "markdown-one demo",
         state = rememberWindowState(width = 1500.dp, height = 950.dp),
     ) {
-        MaterialTheme {
-            Surface {
-                DemoScreen()
-            }
-        }
+        DemoScreen()
     }
 }
 
@@ -324,13 +348,18 @@ private fun DemoScreen() {
     val routes = remember { mutableStateMapOf<String, String>() }
     // 按 fixture 名分组：切 fixture 时不清空面板，靠前缀区分，避免「清了却不重填」。
     val currentName = remember { mutableStateOf(initial.name) }
+    var darkPaper by remember { mutableStateOf(false) }
+    val paper = if (darkPaper) OutsidePaperDark else OutsidePaper
 
-    val config = remember {
+    val theme = outsidePaperTheme(dark = darkPaper)
+
+    val config = remember(theme) {
         MarkdownConfig(
             adapters = listOf(DemoMathAdapter()),
             // 开关演示：原始 HTML 块交给 JCEF 渲染；运行环境没有 org.cef 时自动退回源码。
             webFallback = WebFallback.Jcef,
             allowRawHtml = true,
+            theme = theme,
             diagnostics = object : AdapterDiagnostics {
                 override fun onRoute(blockKey: String, formats: Set<FormatId>, adapterId: String?, kind: AdapterKind?) {
                     val value = "${formats.joinToString("/")} → ${adapterId ?: "无"} (${kind ?: "-"})"
@@ -345,17 +374,17 @@ private fun DemoScreen() {
         )
     }
 
-    Row(Modifier.fillMaxSize()) {
-        Column(Modifier.width(200.dp).fillMaxHeight().background(MaterialTheme.colorScheme.surfaceVariant)) {
+    Row(Modifier.fillMaxSize().background(paper.background)) {
+        Column(Modifier.width(200.dp).fillMaxHeight().background(paper.surface)) {
             FIXTURES.forEach { fixture ->
                 val active = fixture == selected.value
                 Text(
                     text = fixture.name,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = if (active) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = if (active) paper.accent else paper.text,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(if (active) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant)
+                        .background(if (active) paper.inlineCodeBackground else paper.surface)
                         .clickable {
                             currentName.value = fixture.name
                             selected.value = fixture
@@ -363,9 +392,19 @@ private fun DemoScreen() {
                         .padding(horizontal = 12.dp, vertical = 10.dp),
                 )
             }
+            Box(Modifier.weight(1f))
+            Text(
+                text = if (darkPaper) "纸面 · 暗" else "纸面 · 亮",
+                style = MaterialTheme.typography.labelSmall,
+                color = paper.textMuted,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { darkPaper = !darkPaper }
+                    .padding(12.dp),
+            )
         }
 
-        VerticalDivider()
+        VerticalDivider(color = paper.divider.copy(alpha = 0.3f))
 
         Column(Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()).padding(24.dp)) {
             MarkdownText(
@@ -375,14 +414,14 @@ private fun DemoScreen() {
             )
         }
 
-        VerticalDivider()
+        VerticalDivider(color = paper.divider.copy(alpha = 0.3f))
 
         Column(Modifier.width(360.dp).fillMaxHeight().padding(16.dp)) {
-            Text("适配器路由", style = MaterialTheme.typography.titleSmall)
+            Text("适配器路由", style = MaterialTheme.typography.titleSmall, color = paper.text)
             Text(
                 text = "块 → 命中的适配器 (kind)",
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = paper.textMuted,
                 modifier = Modifier.padding(bottom = 8.dp),
             )
             LazyColumn {
@@ -391,6 +430,7 @@ private fun DemoScreen() {
                         text = "${key.substringAfter('/')}  $value",
                         style = MaterialTheme.typography.labelSmall,
                         fontFamily = FontFamily.Monospace,
+                        color = paper.text,
                         modifier = Modifier.padding(vertical = 3.dp),
                     )
                 }

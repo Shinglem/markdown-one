@@ -188,6 +188,53 @@ MarkdownText(markdown, config = MarkdownConfig(adapters = listOf(MyMathAdapter()
 `AdapterKind.Jcef` 同时是诊断面板上的标签：流式期间 kind 为 `Jcef` 的适配器会被跳过，
 避免每帧重载 Chromium。
 
+## 外观
+
+```kotlin
+MarkdownText(markdown, config = MarkdownConfig(theme = outsidePaperTheme()))
+```
+
+[`outsidePaperTheme()`](src/commonMain/kotlin/io/github/shinglem/markdown/MarkdownTheme.kt) 是内置的暖白纸面风格
+（配色取自 typora-outside-theme 的 `outside-paper.css`）：背景 `#FDFCF9`、正文 `#5A524A`、
+砖红强调 `#A8433A`、米黄代码块 `#F6F0E4`、行内码 `#F7E7DF`，行高统一 1.6，标题字号比 Material 默认小一档
+（`displayLarge` 在桌面窗口里会把 h1 撑到近 40sp）。
+
+`outsidePaperTheme(dark = true)` 给暗色变体；`PaperPalette` / `OutsidePaper` 可直接取色自己拼。
+不传 `theme` 就沿用 Material 3 默认值。
+
+## 大块的滚动与缩放
+
+图表、原始 HTML、宽表格这类块经常一屏放不下。`BlockViewportConfig` 会给它们统一加：
+
+- **限高**（默认 420dp）+ 纵向滚动；
+- **横向滚动**（放大后超出宽度时）；
+- **缩放条**（右上角 `− 100% ＋`，点百分比复位）。档位是固定的
+  `40/50/60/70/80/90/100/110/125/150/200/250%` —— 连续加减会产生 `78%` 这种浮点漂移。
+
+```kotlin
+MarkdownConfig(
+    viewport = BlockViewportConfig(
+        maxHeight = 420.dp,
+        formats = setOf("mermaid", "html", "table", "image.generic"),
+    ),
+)
+```
+
+**不要往 `formats` 里加 `code`**：代码块自带横向滚动，再被本容器包一层就成了滚动容器嵌套，
+Compose 会直接抛 `Horizontally scrollable component was measured with an infinity maximum width`。
+
+## 浏览器实例池
+
+每个 `CefBrowser` 是一个独立的 Chromium 渲染进程（单实例就有 5+ 个子进程），所以 `builtin.jcef`
+只保留少量**活跃**浏览器，其余显示「等待浏览器实例」占位：
+
+```kotlin
+MarkdownConfig(jcefPoolSize = 2)   // 默认 2
+```
+
+分配是**先到先得 + 池满排队**，不做抢占 —— 抢占会让「3 个块可见、容量 2」的场景互相踢，
+实测结果是三个块都在重建引擎、谁也渲染不出来。块滚出视口时归还池位，排队中的块借池版本号重新申请。
+
 ## 许可证
 
 [Apache-2.0](LICENSE)。

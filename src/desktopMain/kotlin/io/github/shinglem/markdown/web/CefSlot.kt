@@ -67,9 +67,17 @@ internal class CefSlot(
         }, "markdown-one-cef").apply { isDaemon = true }.start()
     }
 
+    /** 临时释放引擎（池位被别的块抢走），之后还能再次 [request] 重建。 */
+    fun releaseEngine() {
+        val current = synchronized(lock) { engine.also { engine = null } }
+        current?.dispose()
+    }
+
+    /** 永久销毁（块离开组合），之后 [request] 不再创建。 */
     fun dispose() {
         val current = synchronized(lock) {
             disposed = true
+            creating = false
             engine.also { engine = null }
         }
         current?.dispose()
