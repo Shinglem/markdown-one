@@ -66,5 +66,6 @@ public fun builtinAdapters(config: MarkdownConfig): List<BlockAdapter> = listOf(
     io.github.shinglem.markdown.builtin.MarkdownBlockAdapter(config),
     io.github.shinglem.markdown.builtin.CodeHighlightAdapter(config),
     io.github.shinglem.markdown.builtin.MermaidAdapter(config),
+    io.github.shinglem.markdown.builtin.DetailsAdapter(config),
     io.github.shinglem.markdown.builtin.SourceFallbackAdapter,
 ) + platformAdapters(config)

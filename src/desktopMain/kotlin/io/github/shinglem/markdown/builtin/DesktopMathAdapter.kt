@@ -58,7 +58,7 @@ internal class DesktopMathAdapter(private val config: MarkdownConfig) : BlockAda
         val density = LocalDensity.current
         val color = MaterialTheme.colorScheme.onSurface
         val image = remember(math.tex, math.display, density.density, color) {
-            renderTex(math.tex, math.display, density.density, color)
+            renderMathImage(math.tex, math.display, density.density, color)
         }
         if (image == null) {
             Column(modifier.fillMaxWidth().padding(vertical = 4.dp)) {
@@ -80,7 +80,7 @@ internal class DesktopMathAdapter(private val config: MarkdownConfig) : BlockAda
                 modifier.fillMaxWidth().padding(vertical = 6.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Image(bitmap = image, contentDescription = math.tex)
+                Image(bitmap = image.bitmap, contentDescription = math.tex)
             }
         } else {
             Row(
@@ -88,36 +88,8 @@ internal class DesktopMathAdapter(private val config: MarkdownConfig) : BlockAda
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(3.dp),
             ) {
-                Image(bitmap = image, contentDescription = math.tex)
+                Image(bitmap = image.bitmap, contentDescription = math.tex)
             }
         }
     }
-
-    /**
-     * TeX → 位图。
-     *
-     * @param scale 按屏幕密度放大，避免高分屏上发虚。
-     * @param color 公式颜色跟随正文（JLaTeXMath 用前景色绘制字形）。
-     */
-    private fun renderTex(tex: String, display: Boolean, scale: Float, color: Color): ImageBitmap? =
-        MathRenderCache.getOrPut("$tex|$display|$scale|${color.value}") {
-            runCatching {
-                val formula = TeXFormula(tex)
-                val style = if (display) TeXConstants.STYLE_DISPLAY else TeXConstants.STYLE_TEXT
-                // 16f 是正文可读的基准字号（与 markdown 正文 15sp 接近）。
-                val icon = formula.createTeXIcon(style, 16f * scale)
-                icon.setForeground(java.awt.Color(color.red, color.green, color.blue, color.alpha))
-                // +2：给 0 基线字形（下划线、括号端点）留 1px 反锯齿余量，否则会被裁掉一点。
-                val w = icon.iconWidth + 2
-                val h = icon.iconHeight + 2
-                if (w <= 0 || h <= 0) return@runCatching null
-                val image = BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB)
-                val g = image.createGraphics()
-                g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
-                g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON)
-                icon.paintIcon(null, g, 1, 1)
-                g.dispose()
-                image.toComposeImageBitmap()
-            }.getOrNull()
-        }
 }

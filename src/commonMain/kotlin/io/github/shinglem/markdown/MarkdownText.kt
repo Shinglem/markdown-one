@@ -58,6 +58,12 @@ public fun MarkdownText(
     val components = remember { projectMarkdownComponents() }
     val referenceLinks = remember { ReferenceLinkHandlerImpl() }
 
+    // 行内公式：先把整篇里出现的 `$…$` 收集成表，annotator 里按 key 命中同一条。
+    val inlineTexes = remember(markdown) { collectInlineTexes(markdown) }
+    val mathContents = mathInlineContents(inlineTexes)
+    val annotator = rememberMathAnnotator(mathContents)
+    val inlineContent = markdownInlineContent(mathContents)
+
     // 主题可在运行时切换（明暗），所以逐个取 CompositionLocal 当前值，而不是写死默认。
     val theme = config.theme
     val colors = theme?.colors ?: markdownColor()
@@ -78,9 +84,9 @@ public fun MarkdownText(
             LocalMarkdownDimens provides dimens,
             LocalMarkdownPadding provides padding,
             LocalImageTransformer provides Coil3ImageTransformerImpl,
-            LocalMarkdownAnnotator provides markdownAnnotator(),
+            LocalMarkdownAnnotator provides annotator,
             LocalMarkdownExtendedSpans provides markdownExtendedSpans(),
-            LocalMarkdownInlineContent provides markdownInlineContent(),
+            LocalMarkdownInlineContent provides inlineContent,
             LocalMarkdownComponents provides components,
             LocalMarkdownAnimations provides markdownAnimations(),
         ) {

@@ -1,7 +1,5 @@
 package io.github.shinglem.markdown.builtin
 
-import androidx.compose.ui.graphics.ImageBitmap
-
 /**
  * 公式渲染结果缓存（desktop）。
  *
@@ -14,15 +12,15 @@ internal object MathRenderCache {
 
     private const val MAX_ENTRIES = 64
 
-    private val map = object : LinkedHashMap<String, ImageBitmap?>(MAX_ENTRIES, 0.75f, true) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, ImageBitmap?>?): Boolean =
+    private val map = object : LinkedHashMap<String, MathImage?>(MAX_ENTRIES, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, MathImage?>?): Boolean =
             size > MAX_ENTRIES
     }
 
     /** 渲染都在 Compose 主线程，加锁只是兜底（宿主可能多窗口渲染）。 */
     private val lock = Any()
 
-    fun getOrPut(key: String, compute: () -> ImageBitmap?): ImageBitmap? = synchronized(lock) {
+    fun getOrPut(key: String, compute: () -> MathImage?): MathImage? = synchronized(lock) {
         if (map.containsKey(key)) map[key] else compute().also { map[key] = it }
     }
 }
