@@ -29,6 +29,7 @@ import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import io.github.shinglem.markdown.MarkdownConfig
 import io.github.shinglem.markdown.MarkdownText
+import io.github.shinglem.markdown.WebFallback
 import io.github.shinglem.markdown.adapter.AdapterDiagnostics
 import io.github.shinglem.markdown.adapter.AdapterKind
 import io.github.shinglem.markdown.adapter.BlockAdapter
@@ -186,6 +187,9 @@ private fun DemoScreen() {
     val config = remember {
         MarkdownConfig(
             adapters = listOf(DemoMathAdapter()),
+            // 开关演示：原始 HTML 块交给 JCEF 渲染；运行环境没有 org.cef 时自动退回源码。
+            webFallback = WebFallback.Jcef,
+            allowRawHtml = true,
             diagnostics = object : AdapterDiagnostics {
                 override fun onRoute(blockKey: String, formats: Set<FormatId>, adapterId: String?, kind: AdapterKind?) {
                     val value = "${formats.joinToString("/")} → ${adapterId ?: "无"} (${kind ?: "-"})"

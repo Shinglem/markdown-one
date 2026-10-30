@@ -24,5 +24,17 @@ dependencies {
 compose.desktop {
     application {
         mainClass = "io.github.shinglem.markdown.demo.MainKt"
+        // 用 JBR with JCEF 跑 demo 时传 -PjbrHome=<JBR 路径>：
+        // 它会切换到该 JDK 并加上 --add-modules jcef。普通 JDK 下不加，JCEF 适配器自动降级。
+        val jbrHome = providers.gradleProperty("jbrHome").orNull
+        if (jbrHome != null) {
+            javaHome = jbrHome
+            jvmArgs += listOf(
+                "--add-modules", "jcef",
+                // JCEF 内部依赖 sun.awt 的 peer 实现（KCEF 文档列出的必需项）
+                "--add-opens", "java.desktop/sun.awt=ALL-UNNAMED",
+                "--add-opens", "java.desktop/java.awt.peer=ALL-UNNAMED",
+            )
+        }
     }
 }

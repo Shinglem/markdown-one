@@ -41,6 +41,9 @@ public class AdapterRegistry(adapters: List<BlockAdapter>) {
 /** 自动发现：JVM/desktop 用 ServiceLoader，其它端返回空（靠显式注册）。 */
 internal expect fun discoverAdapterFactories(): List<BlockAdapterFactory>
 
+/** 平台专有适配器（例如 desktop 的 JCEF 回落）。 */
+internal expect fun platformAdapters(config: MarkdownConfig): List<BlockAdapter>
+
 /** 组装最终 registry：显式 → 自动发现 → 内置，按 id 去重（先到者胜）。 */
 public fun buildAdapterRegistry(config: MarkdownConfig): AdapterRegistry {
     val seen = LinkedHashMap<String, BlockAdapter>()
@@ -64,4 +67,4 @@ public fun builtinAdapters(config: MarkdownConfig): List<BlockAdapter> = listOf(
     io.github.shinglem.markdown.builtin.CodeHighlightAdapter(config),
     io.github.shinglem.markdown.builtin.MermaidAdapter(config),
     io.github.shinglem.markdown.builtin.SourceFallbackAdapter,
-)
+) + platformAdapters(config)

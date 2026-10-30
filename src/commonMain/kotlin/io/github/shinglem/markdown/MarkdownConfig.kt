@@ -1,7 +1,10 @@
 package io.github.shinglem.markdown
 
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import io.github.shinglem.markdown.adapter.AdapterDiagnostics
 import io.github.shinglem.markdown.adapter.BlockAdapter
+import io.github.shinglem.markdown.model.MdBlock
 
 /**
  * 渲染配置。
@@ -17,6 +20,17 @@ public data class MarkdownConfig(
     public val jcefDuringStreaming: Boolean = false,
     /** 是否允许渲染原始 HTML 块（默认关，只显示源码）。 */
     public val allowRawHtml: Boolean = false,
+    /** 原生适配器画不出时的回落策略。 */
+    public val webFallback: WebFallback = WebFallback.Source,
+    /** 回落渲染的高度（浏览器内容在内部滚动）。 */
+    public val webFallbackHeight: Dp = 320.dp,
+    /**
+     * 为某个块生成交给浏览器渲染的 HTML 文档；返回 null 表示这个块不走回落渲染。
+     *
+     * 默认只处理「原始 HTML 块」（且需 [allowRawHtml]）。数学公式与图表需要 KaTeX / mermaid.js
+     * 之类的脚本资源，由调用方在这里注入（库不打包脚本，保持零体积）。
+     */
+    public val webDocument: ((MdBlock) -> String?)? = null,
     /** 图表画不出时的提示文案。 */
     public val mermaidFallbackText: String = "图表语法暂不支持，已显示源码",
     /** 超过这个长度的代码块跳过同步着色（大块同步着色会卡 UI）。 */
