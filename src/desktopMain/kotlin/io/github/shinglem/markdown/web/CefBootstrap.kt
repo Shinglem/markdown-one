@@ -29,8 +29,24 @@ internal object CefBootstrap {
     @Volatile
     private var instance: Any? = null
 
+    /** 首次初始化失败后记住原因：`CefApp` 是进程级单例，重试只会撞 "already initialized" 而掩盖真相。 */
+    @Volatile
+    private var failure: Throwable? = null
+
     /** 返回已初始化的 `CefApp`，首次调用会阻塞到 `INITIALIZED`（必须在后台线程调）。 */
-    fun app(): Any = instance ?: synchronized(lock) { instance ?: create().also { instance = it } }
+    fun app(): Any {
+        instance?.let { return it }
+        synchronized(lock) {
+            instance?.let { return it }
+            failure?.let { throw IllegalStateException("CEF 初始化此前已失败：${it.message}", it) }
+            return try {
+                create().also { instance = it }
+            } catch (t: Throwable) {
+                failure = t
+                throw t
+            }
+        }
+    }
 
     private fun create(): Any {
         val javaHome = File(System.getProperty("java.home"))
