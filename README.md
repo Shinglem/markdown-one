@@ -1,17 +1,70 @@
 # markdown-one
 
+[![build](https://github.com/Shinglem/markdown-one/actions/workflows/build.yml/badge.svg)](https://github.com/Shinglem/markdown-one/actions/workflows/build.yml)
+[![license](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![Kotlin](https://img.shields.io/badge/kotlin-2.x-7F52FF.svg)](https://kotlinlang.org)
+[![Compose Multiplatform](https://img.shields.io/badge/Compose%20Multiplatform-1.12.x-4285F4.svg)](https://www.jetbrains.com/lp/compose-multiplatform/)
+
 面向 Compose Multiplatform 的 Markdown 渲染组件：**解析 → 块 → 适配器 → 渲染**，
-一条能力不足就降级下一级，最后兜底成源码。
+一条能力不足就降级下一级，最后兜底成源码 —— 永远不会留一块空白。
 
 **目标多端，当前只实现 desktop（JVM）。**
+
+![复杂文档渲染](docs/images/demo-complex.png)
+
+<sub>左侧 fixture 列表、中间渲染结果、右侧实时适配器路由 —— 就是 demo 本身。</sub>
+
+## 特性
+
+- **块级适配器链**：每种内容类型（代码、图表、公式、原始 HTML、表格…）独立路由到最合适的渲染器，
+  失败只影响那一块。见 [架构](docs/architecture.md)。
+- **可替换**：调用方通过 `MarkdownConfig.adapters` 覆盖任何内置实现，或用
+  `META-INF/services` 让独立 artifact 自动生效。见 [写适配器](docs/adapters.md)。
+- **永远有东西看**：没有合适渲染器时显示源码，而不是空白或一串异常。
+- **原生优先**：代码高亮、表格、列表、图表（纯 Kotlin mermaid 引擎）都是 Compose 绘制，不引 WebView。
+- **JCEF 回落（可选）**：真正需要浏览器时（KaTeX、完整 mermaid 语法、任意 HTML），
+  用 OSR 离屏渲染接进来。库对 `org.cef.*` **零编译期依赖**，普通 JDK 照常构建。
+  见 [JCEF](docs/jcef.md)。
+- **流式友好**：未闭合栅栏自动补齐；流式期间浏览器类适配器自动让位，避免每帧重载。
+- **大块可用**：限高 + 双向滚动条 + 百分比缩放档位；浏览器实例按可见性分配，长文档也只驻留 1–2 个进程。
+- **外观可换**：内置暖白纸面主题，明暗两套色板。
 
 ## 状态
 
 | 项 | 状态 |
 |---|---|
 | desktop（JVM） | ✅ 可用 |
-| Android / iOS / Web | 结构已预留（见「多端」），未实现 |
+| Android / iOS / Web | 结构已预留（见 [多端](#多端)），未实现 |
 | 发布 | 未发布到 Maven Central；当前以 git submodule 或本地构建接入 |
+
+## 快速开始
+
+```kotlin
+dependencies {
+    // 以 git submodule 挂在 :modules/markdown-one 时的写法
+    implementation(project(":modules:markdown-one"))
+}
+```
+
+```kotlin
+MarkdownText(
+    markdown = text,
+    streaming = isAnswering,   // 流式：图表先占位，未闭合栅栏会被补齐
+    config = MarkdownConfig(), // 适配器、主题、视口、诊断
+)
+```
+
+需要纸面外观：
+
+```kotlin
+MarkdownText(markdown, config = MarkdownConfig(theme = outsidePaperTheme(dark = isDark)))
+```
+
+跑起来看效果：
+
+```bash
+./gradlew :demo:run
+```
 
 ## 为什么是「适配器」
 
@@ -39,17 +92,54 @@ MdBlock ──► AdapterRegistry
 | `builtin.markdown` | `markdown` | mikepenz 的 element composable |
 | `builtin.code` | `code:*` | Highlights + 8 组正则补丁 |
 | `builtin.mermaid` | `mermaid` / `code:mermaid` | `io.github.swithun-liu:mermaid-compose`（纯 Kotlin，无 WebView） |
+| `builtin.jcef` | `html` / `math` / `mermaid` | JCEF OSR（仅 desktop，`webFallback = Jcef` 时注册） |
 | `builtin.source` | `*` | 源码兜底 |
 
-## 用法
+## 文档
 
-```kotlin
-MarkdownText(
-    markdown = text,
-    streaming = isAnswering,   // 流式：图表先占位，未闭合栅栏会被补齐
-    config = MarkdownConfig(), // 适配器、文案、诊断回调
-)
+| 文档 | 内容 |
+|---|---|
+| [架构](docs/architecture.md) | 渲染链路、块模型、路由规则、线程与生命周期 |
+| [写适配器](docs/adapters.md) | SPI 语义、注册方式、自定义块、视口、诊断 |
+| [JCEF 回落](docs/jcef.md) | 运行环境、开关、六个静默失败的坑、名额与生命周期、安全 |
+| [API 参考](docs/api.md) | `MarkdownText` / `MarkdownConfig` / `BlockViewportConfig` / `MdBlock` / 主题 |
+| [常见问题](docs/faq.md) | 显示成源码、图表画不出、空白帧、滚动条、性能 |
+| [贡献指南](CONTRIBUTING.md) | 环境、自检清单、代码风格、提交规范、加 target |
+| [变更日志](CHANGELOG.md) | 版本历史与已知问题 |
+
+## 开发
+
+```bash
+./gradlew :desktopTest   # 单元测试
+./gradlew :demo:run      # sandbox
+./gradlew build          # 全量构建
+
+# 指定启动时选中的 fixture（序号或名称）
+./gradlew :demo:run -Pfixture=0
+
+# 用 JBR with JCEF 跑（自动加 --add-modules jcef 等参数），验证 JCEF 回落
+./gradlew :demo:run -PjbrHome="C:\path\to\jbrsdk_jcef" -Pfixture=6
+
+# 大块的初始缩放（验证横向滚动条）与正文初始滚动位置
+./gradlew :demo:run -Pzoom=1.5 -Pscroll=760
 ```
+
+demo 左侧是 fixture 列表，右侧「适配器路由」实时显示**每个块命中的适配器**，
+是这套架构最有效的自检工具。
+
+| # | fixture | 用来检查 |
+|---|---|---|
+| 0 | 复杂综合文档 | 标题（含 setext）、行内格式、嵌套列表与任务列表、表格、四种语言代码块、flowchart 与 sequence 图、公式、原始 HTML、嵌套引用、分割线、长段落 |
+| 1 | 基础语法 | 行内排版与段落间距 |
+| 2 | 代码块 | 高亮、语言标签、复制按钮 |
+| 3 | 表格 | 视口限高与横向滚动 |
+| 4 | 图表 | mermaid 引擎覆盖的图族 |
+| 5 | 流式未闭合 | 未闭合栅栏补齐、图表占位 |
+| 6 | 多个 HTML 块（池上限 2） | JCEF 名额分配与占位 |
+| 7 | 原始 HTML 与公式 | `webDocument` 接管路径 |
+
+`-Pfixture` / `-Pzoom` / `-Pscroll` 也接受环境变量 `DEMO_FIXTURE` / `DEMO_ZOOM` / `DEMO_SCROLL`
+（Gradle 会累积 `jvmArgs`，同一次 daemon 里反复换 `-P` 值不一定生效，截图脚本用环境变量更稳）。
 
 ## 构建契约（改动前务必先读）
 
@@ -75,15 +165,19 @@ MarkdownText(
   因此在任何 JDK 上都能构建，其它 target 也不会看到它。
 
 `LRU` 缓存等 JVM 专有实现也集中在 `desktopMain`，加 target 时按平台各写一份。
+具体步骤见 [CONTRIBUTING · 加一个 target](CONTRIBUTING.md#加一个-target)。
 
 ## 目录
 
 ```
 markdown-one/
 ├── build.gradle.kts        ← 核心库（KMP）
-├── src/commonMain/         ← 模型 / 解析 / 适配器 SPI / 内置适配器
-├── src/desktopMain/        ← ServiceLoader 发现、JCEF 反射适配器（web/）
-└── demo/                   ← Compose Desktop sandbox
+├── src/commonMain/         ← 模型 / 解析 / 适配器 SPI / 内置适配器 / 主题 / 视口
+├── src/desktopMain/        ← ServiceLoader 发现、JCEF 反射适配器（web/）、原生滚动条
+├── src/commonTest/         ← 单元测试
+├── demo/                   ← Compose Desktop sandbox
+├── docs/                   ← 架构 / 适配器 / JCEF / API / FAQ
+└── .github/                ← CI、issue 与 PR 模板
 ```
 
 ## 依赖
@@ -96,167 +190,22 @@ markdown-one/
 | 图片 | `io.coil-kt.coil3:coil-compose` / `coil-svg` | 3.6.3 |
 | 图表 | `io.github.swithun-liu:mermaid-compose` | 0.1.21 |
 
-版本只在 `build.gradle.kts` 顶部出现一次。
+版本只在 `build.gradle.kts` 顶部出现一次，改版本时同步这张表。
+JCEF **不是**依赖：它经由 JBR 提供，运行期反射发现。
 
-## 开发
+## 能力边界
 
-```bash
-./gradlew :desktopTest   # 单元测试
-./gradlew :demo:run      # sandbox
+这些是刻意的取舍，不是待修 bug：
 
-# 指定启动时选中的 fixture（序号或名称）
-./gradlew :demo:run -Pfixture=0
-
-# 用 JBR with JCEF 跑（自动加 --add-modules jcef 等参数），验证 JCEF 回落
-./gradlew :demo:run -PjbrHome="C:\path\to\jbrsdk_jcef" -Pfixture=6
-
-# 大批块的初始缩放（验证横向滚动条）与正文初始滚动位置
-./gradlew :demo:run -Pzoom=1.5 -Pscroll=760
-```
-
-`-Pfixture` / `-Pzoom` / `-Pscroll` 也接受环境变量 `DEMO_FIXTURE` / `DEMO_ZOOM` / `DEMO_SCROLL`
-（Gradle 会累积 `jvmArgs`，同一次 daemon 里反复换 `-P` 值不一定生效，截图脚本用环境变量更稳）。
-
-demo 左侧是 fixture 列表，右侧「适配器路由」实时显示**每个块命中的适配器**，
-是这套架构最有效的自检工具。`复杂综合文档` 覆盖了标题（含 setext）、行内格式、
-嵌套列表与任务列表、表格、四种语言代码块、flowchart 与 sequence 图、公式、原始 HTML、
-嵌套引用、分割线与长段落。
-
-## 扩展：接入你自己的适配器
-
-库只内置纯 Compose 的适配器。任何需要平台能力（内嵌浏览器、原生控件）的内容，
-由调用方自己实现 [BlockAdapter] 并通过 `MarkdownConfig.adapters` 注册。
-
-### 最小实现
-
-```kotlin
-class MyMathAdapter : BlockAdapter {
-    override val id = "my.math"
-    override val kind = AdapterKind.Native
-    override val priority = 120                  // 高于内置的 100 即接管
-    override fun formats() = setOf(Formats.Math) // 也可声明多种格式
-    override fun isAvailable() = true
-    override fun canRender(block: MdBlock) = block is MdBlock.Math
-
-    @Composable
-    override fun Render(block: MdBlock, modifier: Modifier) {
-        val math = block as MdBlock.Math
-        // 画不出来时自行显示 math.raw —— 库的兜底只在「没有适配器命中」时生效
-    }
-}
-
-MarkdownText(markdown, config = MarkdownConfig(adapters = listOf(MyMathAdapter())))
-```
-
-自动发现也可用：在可选 artifact 里放
-`META-INF/services/io.github.shinglem.markdown.adapter.BlockAdapterFactory`，实现 `BlockAdapterFactory`，
-依赖在 classpath 上就会生效（JVM/desktop 端）。
-
-### 用 JCEF 兜底原生画不出的内容
-
-`WebFallback.Jcef` 打开后，`builtin.jcef` 会用 **JCEF 离屏渲染（OSR）** 把块画出来，
-再把 BGRA 帧交给 Skia。库对 `org.cef.*` **没有编译期依赖**（全程反射），
-所以普通 JDK 上照常构建，运行时找不到 `org.cef` 就自动退回 `builtin.source`。
-
-**运行时要求**
-
-1. **JBR with JCEF**（或自备 CEF 运行时）；
-2. 启动参数 `--add-modules jcef --enable-native-access=jcef`
-   （后者是 JDK 24+ 加载 native 的许可，将来会强制）；
-   demo 传 `-PjbrHome=<JBR 路径>` 会自动带上。
-
-**JBR 上把 CEF 拉起来要做的四件事**（[CefBootstrap.kt](src/desktopMain/kotlin/io/github/shinglem/markdown/web/CefBootstrap.kt) 里都做了，
-列出来是因为每一条都对应一次「什么都没发生」的静默失败）：
-
-| 步骤 | 不做的后果 |
+| 内容 | 做法 |
 |---|---|
-| `CefApp.startup(new String[0])` **必须先于** `getInstance` | `getState()` 永远停在 `NEW`。JBR 的 `getInstance` 只是把初始化挂在一个内部 future 上，**只有 `startup` 才会完成它**；CEF 自己的 native 日志也不会生成。 |
-| `settings.browser_subprocess_path` 指向 `<java.home>/bin/jcef_helper.exe` | CEF 把 `--type=gpu-process` 传给 `java.exe`，子进程报 `Unrecognized option` 后退出，GPU/网络进程全崩。 |
-| `settings.cache_path` 按进程隔离 | 两个进程共用默认 user data 目录时，后启动的会连到已有实例（日志：`Opening in existing browser session.`）并卡在 `NEW`。 |
-| `browser.createImmediately()` | OSR 浏览器是惰性创建的，不调就没有渲染进程，`onPaint` 永远不来。 |
+| HTML 嵌入 | 默认显示源码；`allowRawHtml = true` 后交给浏览器 |
+| 数学公式（KaTeX） | 库不带脚本资源；用 `webDocument` 注入自己的页面 |
+| 完整 mermaid 语法 | 纯 Kotlin 引擎只覆盖常见图族，其余显示源码 + 提示；需要全量就切浏览器 |
+| 社交卡片 / 远程内嵌 | 不做，显示为链接 |
 
-反射还有一条硬规矩：**方法一律从 `CefBrowser` 接口上取**，别用实现类 `CefBrowser_N` ——
-后者虽然是 `public`，在 jcef 模块里却不可访问，会抛 `IllegalAccessException`。
-
-还有一个只在长文档里才暴露的坑：`CefRenderHandler.getScreenInfo` **必须填充 `CefScreenInfo`
-并返回 `true`**。返回 `false` 时 CEF 认为该浏览器没有可用屏幕，`onPaint` 一帧都不会来，
-表现就是「占据了一块高度但永远空白」，日志里也没有任何报错。
-
-**仍然要自己处理的点**
-
-- **有界高度**：OSR 先有尺寸才出帧，适配器按 `MarkdownConfig.webFallbackHeight` 定高，
-  内容在页面内滚动；
-- **实例池**：每个 `CefBrowser` 是独立的渲染进程，长文档里一块一个会吃很多内存；
-  用 `webDocument` 收窄回落范围，而不是把整个文档都交给浏览器；
-- **网络白名单**：LLM 输出里的 `<img src="http://...">` 是追踪像素，需要自己拦
-  （本库尚未内置请求拦截）。
-
-`AdapterKind.Jcef` 同时是诊断面板上的标签：流式期间 kind 为 `Jcef` 的适配器会被跳过，
-避免每帧重载 Chromium。
-
-## 外观
-
-```kotlin
-MarkdownText(markdown, config = MarkdownConfig(theme = outsidePaperTheme()))
-```
-
-[`outsidePaperTheme()`](src/commonMain/kotlin/io/github/shinglem/markdown/MarkdownTheme.kt) 是内置的暖白纸面风格
-（配色取自 typora-outside-theme 的 `outside-paper.css`）：背景 `#FDFCF9`、正文 `#5A524A`、
-砖红强调 `#A8433A`、米黄代码块 `#F6F0E4`、行内码 `#F7E7DF`，行高统一 1.6，标题字号比 Material 默认小一档
-（`displayLarge` 在桌面窗口里会把 h1 撑到近 40sp）。
-
-`outsidePaperTheme(dark = true)` 给暗色变体；`PaperPalette` / `OutsidePaper` 可直接取色自己拼。
-不传 `theme` 就沿用 Material 3 默认值。
-
-## 大块的滚动与缩放
-
-图表、原始 HTML、宽表格这类块经常一屏放不下。`BlockViewportConfig` 会给它们统一加：
-
-- **限高**（默认 420dp）+ 纵向滚动；
-- **横向滚动**（放大后超出宽度时）；
-- **缩放条**（右上角 `− 100% ＋`，点百分比复位）。档位是固定的
-  `40/50/60/70/80/90/100/110/125/150/200/250%` —— 连续加减会产生 `78%` 这种浮点漂移。
-
-```kotlin
-MarkdownConfig(
-    viewport = BlockViewportConfig(
-        maxHeight = 420.dp,
-        // 默认值。`table` 能生效是因为 MdBlock.Table 的 formats 里同时带了 `markdown` 与 `table`。
-        formats = setOf("mermaid", "html", "table", "image.generic"),
-        initialZoom = 1f,
-    ),
-)
-```
-
-滚动条是叠加在内容上的（不参与布局），桌面端用 Compose 原生 `VerticalScrollbar` / `HorizontalScrollbar`。
-缩放实现是「**先布局放大、再 `graphicsLayer` 缩放**」：`Modifier.scaleLayout()` 必须包在
-`Modifier.width(availableWidth)` **外面**，否则内容宽度停留在原尺寸，横向滚动范围算出来是 0，
-横条永远不出现（实测踩过一次）。
-
-**不要往 `formats` 里加 `code`**：代码块自带横向滚动，再被本容器包一层就成了滚动容器嵌套，
-Compose 会直接抛 `Horizontally scrollable component was measured with an infinity maximum width`。
-
-## 浏览器实例池
-
-每个 `CefBrowser` 是一个独立的 Chromium 渲染进程（单实例就有 5+ 个子进程），所以 `builtin.jcef`
-只保留少量**活跃**浏览器，其余显示「等待浏览器实例」占位：
-
-```kotlin
-MarkdownConfig(jcefPoolSize = 2)   // 默认 2
-```
-
-名额**由可见性决定**：块在 `onGloballyPositioned` 里上报自己到视口中心的距离（含半屏预取 margin），
-池子按「已持有 → 距离近」排序取前 `jcefPoolSize` 个。滚出范围的块归还名额并释放引擎，
-滚进来的块接手重建。
-
-为什么不是先到先得：第一帧所有块同时申请，离屏的块会占着名额不放，屏幕上真正可见的块反而一直显示
-「等待浏览器实例」（实测复现）。为什么不做「引擎轮转复用」（同一个 `CefBrowser` 换块、反复 `loadURL`）：
-native 层直接崩，`exit 0x80000003`，连 Java 堆栈都没有。
-
-首块永远空白是另一个独立的坑：**第一个 `CefBrowser` 上「创建后再 `loadURL`」会丢**。
-内容必须作为**初始 URL** 传给 `CefBrowserOsrWithHandler` 的构造函数，见 `CefEngine.dataUrl`。
+更多排查路径见 [常见问题](docs/faq.md)。
 
 ## 许可证
 
 [Apache-2.0](LICENSE)。
-

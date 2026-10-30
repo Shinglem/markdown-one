@@ -1,0 +1,85 @@
+name: Bug 报告
+description: 渲染结果不对、崩溃、或某块显示成源码
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈。请尽量给出**最小复现**：越短的 Markdown 片段越容易定位。
+        提交前建议先看 [常见问题](https://github.com/Shinglem/markdown-one/blob/main/docs/faq.md)。
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: 现象
+      description: 实际看到了什么？期望看到什么？
+    validations:
+      required: true
+
+  - type: textarea
+    id: markdown
+    attributes:
+      label: 最小复现的 Markdown
+      description: 直接贴源码片段，不要贴截图
+      render: markdown
+    validations:
+      required: true
+
+  - type: textarea
+    id: routes
+    attributes:
+      label: 路由诊断
+      description: |
+        把下面的配置加上，贴出对应块的输出：
+        ```kotlin
+        MarkdownConfig(diagnostics = object : AdapterDiagnostics {
+            override fun onRoute(blockKey: String, formats: Set<FormatId>, adapterId: String?, kind: AdapterKind?) {
+                println("$blockKey $formats → $adapterId ($kind)")
+            }
+            override fun onFailure(adapterId: String, blockKey: String, error: Throwable?) {
+                println("$blockKey 失败 $adapterId ${error?.message}")
+            }
+        })
+        ```
+      render: text
+    validations:
+      required: false
+
+  - type: input
+    id: version
+    attributes:
+      label: 库版本
+      description: commit hash 或依赖版本
+      placeholder: e.g. e105989
+    validations:
+      required: true
+
+  - type: input
+    id: jdk
+    attributes:
+      label: JDK / JBR
+      description: JCEF 相关问题请注明是否 JBR with JCEF
+      placeholder: e.g. JBR 25.0.4.1 (jbrsdk_jcef) / Temurin 25
+    validations:
+      required: true
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: 平台
+      options:
+        - desktop / Windows
+        - desktop / macOS
+        - desktop / Linux
+        - 其它（在「日志」里说明）
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: 日志 / 截图 / 堆栈
+      description: JCEF 相关请附 CEF 的 native 日志（cache_path 目录下的 *.log）
+      render: text
+    validations:
+      required: false

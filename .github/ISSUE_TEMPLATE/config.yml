@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 使用问题 / 怎么接入
+    url: https://github.com/Shinglem/markdown-one/blob/main/docs/faq.md
+    about: 先看常见问题，包含「某块显示成源码」「JCEF 空白」「滚动条看不到」等
+  - name: 想写自己的适配器
+    url: https://github.com/Shinglem/markdown-one/blob/main/docs/adapters.md
+    about: SPI 每个方法的语义、注册方式与常见陷阱

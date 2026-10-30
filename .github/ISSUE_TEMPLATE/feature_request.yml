@@ -1,0 +1,49 @@
+name: 功能建议
+description: 新的适配器、新的 target、或渲染能力
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        提之前可以先看 [架构](https://github.com/Shinglem/markdown-one/blob/main/docs/architecture.md)：
+        如果需求是「某类内容换个渲染方式」，通常做成 `BlockAdapter` 就够了，不需要改核心。
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: 想解决什么问题
+      description: 场景 + 现状，别只写「支持 X」
+    validations:
+      required: true
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: 属于哪一类
+      options:
+        - 新的适配器（某类内容需要不同的渲染手段）
+        - 新的目标平台（Android / iOS / Web）
+        - 现有渲染效果改进
+        - 性能 / 内存
+        - 文档 / 开发者体验
+        - 其它
+    validations:
+      required: true
+
+  - type: textarea
+    id: approach
+    attributes:
+      label: 你设想的做法（可选）
+      description: 如果已经调研过可选项，写在这里 —— 依赖坐标、许可证、已知的坑都很有用
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: constraints
+    attributes:
+      label: 约束确认
+      options:
+        - label: 我理解本库「宁可降级也不静默替换」的原则（画不出就显示源码 + 提示）
+          required: true
+        - label: 涉及新依赖时，我会确认许可证与 Maven Central 可用性
+          required: false
