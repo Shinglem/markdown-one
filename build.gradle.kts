@@ -26,6 +26,7 @@ val vIntellijMarkdown = "0.7.3"
 val vHighlights = "1.1.0"
 val vCoil = "3.6.3"
 val vMermaidCmp = "0.1.21"
+val vJLatexMath = "1.0.7"
 
 kotlin {
     jvm("desktop") {
@@ -33,6 +34,9 @@ kotlin {
     }
 
     sourceSets {
+        // target 用自定义名 `jvm("desktop")`，`desktopMain` 没有生成的访问器，显式取。
+        val desktopMain = getByName("desktopMain")
+
         commonMain.dependencies {
             implementation(compose.runtime)
             implementation(compose.foundation)
@@ -56,6 +60,13 @@ kotlin {
 
             // mermaid 纯 Kotlin 引擎（无 WebView），ADR 见 .design
             implementation("io.github.swithun-liu:mermaid-compose:$vMermaidCmp")
+        }
+
+        // 公式排版：JLaTeXMath 是纯 Java 的 LaTeX 排版引擎（Apache-2.0），
+        // 直接画到 AWT Graphics2D，再转 ImageBitmap —— 不需要 WebView / JCEF。
+        // 只在 desktop 注册适配器，其它 target 保持源码兜底。
+        desktopMain.dependencies {
+            implementation("org.scilab.forge:jlatexmath:$vJLatexMath")
         }
 
         commonTest.dependencies {

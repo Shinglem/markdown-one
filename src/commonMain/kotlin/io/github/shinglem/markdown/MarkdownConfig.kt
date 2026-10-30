@@ -38,6 +38,8 @@ public data class MarkdownConfig(
     public val jcefPoolSize: Int = 2,
     /** 图表画不出时的提示文案。 */
     public val mermaidFallbackText: String = "图表语法暂不支持，已显示源码",
+    /** 公式排版失败时的提示文案（desktop 用 JLaTeXMath 原生排版，其它端或语法不支持时回落源码）。 */
+    public val mathFallbackText: String = "公式排版不可用，已显示源码",
     /** 超过这个长度的代码块跳过同步着色（大块同步着色会卡 UI）。 */
     public val maxSyncHighlightLength: Int = 8_000,
     /** 链接点击回调。 */
