@@ -102,6 +102,10 @@ public data class BlockViewportConfig(
 **不要往 `formats` 里加 `code`**：代码块自带横向滚动，再包一层会抛
 `Horizontally scrollable component was measured with an infinity maximum width`。
 
+表格在 150% 缩放下的样子（限高 + 底部横向滚动条 + 右上角缩放条）：
+
+![视口](images/demo-viewport.png)
+
 ## MarkdownTheme
 
 ```kotlin
