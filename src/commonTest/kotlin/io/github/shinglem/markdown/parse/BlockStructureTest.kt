@@ -1,5 +1,6 @@
 package io.github.shinglem.markdown.parse
 
+import io.github.shinglem.markdown.adapter.Formats
 import io.github.shinglem.markdown.model.MdBlock
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -60,6 +61,13 @@ class BlockStructureTest {
     fun `表格识别为 table 块`() {
         val block = parser.parse("| a | b |\n| --- | --- |\n| 1 | 2 |\n", streaming = false).blocks.single()
         assertTrue(block is MdBlock.Table)
+    }
+
+    @Test
+    fun `表格块同时带 markdown 与 table 格式`() {
+        // 带 `table` 是给 BlockViewportConfig 用的：表格仍然由 markdown 适配器渲染。
+        val block = parser.parse("| a | b |\n| --- | --- |\n| 1 | 2 |\n", streaming = false).blocks.single()
+        assertEquals(setOf(Formats.Markdown, Formats.Table), block.formats)
     }
 
     @Test

@@ -89,7 +89,9 @@ public sealed interface MdBlock {
         override val raw: String,
         override val node: ASTNode,
     ) : MdBlock {
-        override val formats: Set<FormatId> get() = setOf(Formats.Markdown)
+        // 同时带 `markdown`：表格仍然由 markdown 适配器渲染，
+        // 额外带上 `table` 只是为了让 BlockViewportConfig 能单独给表格限高加滚动条。
+        override val formats: Set<FormatId> get() = setOf(Formats.Markdown, Formats.Table)
     }
 
     public data class Rule(

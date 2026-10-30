@@ -26,6 +26,7 @@ public object Formats {
     public val Mermaid: FormatId = FormatId("mermaid")
     public val Math: FormatId = FormatId("math")
     public val Html: FormatId = FormatId("html")
+    public val Table: FormatId = FormatId("table")
     public val Image: FormatId = FormatId("image.generic")
     public val Any: FormatId = FormatId("*")
 
