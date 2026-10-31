@@ -362,7 +362,8 @@ private fun MdBlockNode(source: String, node: ASTNode, depth: Int) {
         }
 
         node.type == MarkdownTokenTypes.HORIZONTAL_RULE -> MdRule(Modifier.fillMaxWidth())
-        // 嵌套层级里的 HTML / 表格 / 块级公式没有对应的原生组件：显示源码，不留空白
+        node.type == GFMElementTypes.TABLE -> MdTable(source, node, Modifier.fillMaxWidth())
+        // 嵌套层级里的 HTML / 块级公式没有对应的原生组件：显示源码，不留空白
         else -> MdSource(source.substring(node.startOffset, node.endOffset), Modifier.fillMaxWidth())
     }
 }

@@ -13,6 +13,7 @@ import io.github.shinglem.markdown.text.MdList
 import io.github.shinglem.markdown.text.MdParagraph
 import io.github.shinglem.markdown.text.MdQuote
 import io.github.shinglem.markdown.text.MdRule
+import io.github.shinglem.markdown.text.MdTable
 
 /**
  * 默认的 Markdown 块渲染器（id 仍是 `builtin.markdown`，诊断面板与宿主配置不用改）。
@@ -50,6 +51,7 @@ internal class TextBlockAdapter(@Suppress("unused") private val config: Markdown
             is MdBlock.Rule -> MdRule(modifier)
             is MdBlock.Quote -> MdQuote(block.source, block.node, modifier)
             is MdBlock.ListBlock -> MdList(block.source, block.node, block.ordered, modifier)
+            is MdBlock.Table -> MdTable(block.source, block.node, modifier)
             else -> SourceFallbackAdapter.Render(block, modifier)
         }
     }
