@@ -23,8 +23,9 @@ public fun MarkdownText(
 | `streaming` | 流式输出中：图表先占位、未闭合栅栏会被补齐、`kind = Jcef` 的适配器被跳过 |
 | `config` | 见下表。`remember(config)` 会重建 registry，所以**不要每次重组都 new 一个** |
 
-内部会自己铺整套 mikepenz `CompositionLocal`（不使用它的 `Markdown()` 入口），
-所以宿主不需要额外配置 markdown renderer。
+内部会自己铺整套渲染层 `CompositionLocal`（`text/` 包里的 `LocalMdColors` / `LocalMdTypography` /
+`LocalMdDimens` / `LocalMdPadding`），文本与块组件全部是本库自研实现，
+所以宿主不需要额外配置任何第三方 markdown renderer。
 
 ## MarkdownConfig
 
@@ -110,15 +111,47 @@ public data class BlockViewportConfig(
 
 ```kotlin
 public data class MarkdownTheme(
-    public val colors: MarkdownColors,        // mikepenz 的颜色表
-    public val typography: MarkdownTypography,
-    public val dimens: MarkdownDimens,
-    public val padding: MarkdownPadding,
+    public val colors: MdColors,
+    public val typography: MdTypography,
+    public val dimens: MdDimens,
+    public val padding: MdPadding,
     public val background: Color = Color.Unspecified,
 )
 
 public fun outsidePaperTheme(dark: Boolean = false): MarkdownTheme
+public fun markdownMaterialTheme(): MarkdownTheme
 ```
+
+四张表都是 `io.github.shinglem.markdown.text` 里的公开类型，想自定义外观就直接拼：
+
+```kotlin
+public data class MdColors(
+    public val text: Color, public val codeBackground: Color, public val inlineCodeBackground: Color,
+    public val highlightText: Color, public val highlightBackground: Color,
+    public val dividerColor: Color, public val tableBackground: Color,
+)
+
+public data class MdTypography(   // text / code / inlineCode / h1..h6 / quote / paragraph /
+    ...                           // ordered / bullet / list / table / textLink
+)
+
+public data class MdDimens(       // dividerThickness / codeBackgroundCornerSize /
+    ...                           // blockQuoteThickness / tableCellPadding / tableCornerSize
+)
+
+public data class MdPadding(      // block / list / listItemTop / listItemBottom / listIndent /
+    ...                           // codeBlock / blockQuote / blockQuoteText
+)
+
+// 默认值都是 Material 3（与 markdownMaterialTheme 的取值一致）
+@Composable public fun mdColors(...): MdColors
+@Composable public fun mdTypography(...): MdTypography
+@Composable public fun mdDimens(...): MdDimens
+@Composable public fun mdPadding(...): MdPadding
+```
+
+自己写适配器时可以读 `LocalMdColors` / `LocalMdTypography` / `LocalMdDimens` / `LocalMdPadding`，
+保证自定义块与内置块的外观一致。
 
 内置主题取自 typora `outside-theme` 的 **Outside Paper** 配色：暖白纸面 `#FDFCF9`、
 正文 `#5A524A`、砖红强调 `#A8433A`、米黄代码块 `#F6F0E4`、行内码 `#F7E7DF`，行高统一 1.6。

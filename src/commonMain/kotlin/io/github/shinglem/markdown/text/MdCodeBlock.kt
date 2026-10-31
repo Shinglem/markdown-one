@@ -78,7 +78,6 @@ internal fun MdCodeBlock(
                 color = colors.text.copy(alpha = 0.6f),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f, fill = false),
             )
             Spacer(Modifier.weight(1f))
             CopyCodeButton(code)

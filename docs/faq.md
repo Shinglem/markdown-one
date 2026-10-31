@@ -116,5 +116,5 @@ MarkdownConfig(maxSyncHighlightLength = 4_000)
 
 ## 可以商用吗
 
-可以，[Apache-2.0](../LICENSE)。注意 mermaid 引擎、mikepenz renderer 等依赖各自的许可证，
+可以，[Apache-2.0](../LICENSE)。注意 mermaid 引擎、代码高亮、Coil 等依赖各自的许可证，
 见 [README · 依赖](../README.md#依赖)。

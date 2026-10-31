@@ -20,8 +20,8 @@ import io.github.shinglem.markdown.model.MdBlock
  * 块级 HTML 容器（`<div align="center">…</div>`、`<center>…</center>`、`<p align=…>` 等）。
  *
  * 只做一件事：剥掉容器标签，把里面的内容交回 [MarkdownText] 递归渲染。
- * `align` 用「换一套 [MarkdownTypography]（textAlign）」实现，而不是靠布局居中 ——
- * mikepenz 的段落是整宽 `Text`，只有 textAlign 能真正让文字与行内图片居中。
+ * `align` 用「换一套 [io.github.shinglem.markdown.text.MdTypography]（textAlign）」实现，
+ * 而不是靠布局居中 —— 段落是整宽 `Text`，只有 textAlign 能真正让文字与行内图片居中。
  *
  * 剥完没有可见内容（纯 `<br>`、注释、脚本）时不画任何东西：这些内容本来就没有可见语义。
  */

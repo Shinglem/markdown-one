@@ -9,11 +9,23 @@
 
 ### 修复
 
-- 行内公式的 annotator 不再在 `MarkdownTokenTypes.TEXT` 上兜底扫描 `$…$`：
-  `CODE_SPAN` 的子节点同样是 `TEXT`，兜底会把行内代码里的 `$x$` 渲染成公式。
+- 行内构建器在 `MarkdownTokenTypes.TEXT` 上不做 `$…$` 文本扫描：
+  `CODE_SPAN` 的子节点同样是 `TEXT`，扫描会把行内代码里的 `$x$` 渲染成公式。
 
 ### 变更
 
+- **移除 `com.mikepenz:multiplatform-markdown-renderer*` 全部 4 个依赖**，文本与块渲染改为自研
+  `io.github.shinglem.markdown.text` 包：
+  - `MdInline`：一次走完 AST 生成 `AnnotatedString`（strong / emph / 删除线 / 高亮 / 行内码 /
+    链接 / 自动链接 / 引用式链接 / 图片 / 软硬换行 / 转义），顺手处理公式与图片的 inline content；
+  - `MdBlocks` / `MdTable` / `MdCodeBlock`：段落、标题（ATX 与 setext）、引用、列表（含任务列表）、
+    表格、分割线、代码块外壳；
+  - `MdColors` / `MdTypography` / `MdDimens` / `MdPadding`：替换主题里第三方 renderer 的模型，
+    `outsidePaperTheme()` 与 `markdownMaterialTheme()` 语义不变。
+  收益：渲染层再也没有第三方控件的黑盒，块的粒度、间距与降级路径都由自己掌握。
+- `builtin.markdown` 由 `TextBlockAdapter` 接管（id、kind、priority 不变，宿主配置与诊断面板不受影响）。
+- 引用式链接（`[文字][label]`）现在会扫描全文的链接定义并真正跳转；以前只能显示成源码。
+- `SelectionContainer` 由 `MarkdownText` 外层统一包一层，跨块选区不再断成若干段。
 - **公式引擎换成 `io.github.huarangmeng:latex-renderer:1.6.3`**（MIT，Compose 原生矢量绘制 +
   KaTeX 字体），删除 JLaTeXMath 与自建的位图缓存（`MathImage` / `MathRenderCache`）。
   行内与块级共用 `rememberLatexConfig`，字号取正文字号、颜色取正文色。
@@ -31,9 +43,14 @@
   紧贴中文标点/汉字的 `$…$`（如 `时，$\bar{x}$`）不再渲染成公式，按源码显示 ——
   这与 GitHub/KaTeX 的宽松规则不同，是刻意选择（上游 #196 为修 #179 的货币误判引入）。
   为此删除了 `parse/InlineMathRepair`（原先会把这批 `$…$` 补成 `INLINE_MATH`）。
-- annotator 接管 `GFMTokenTypes.DOLLAR` 并原样输出：未识别成公式的 `$` 在 mikepenz 的
-  `else` 分支里会被静默丢弃（`时，$x$` 会渲染成 `时，x`），接管后保持源码完整。
-- `org.jetbrains:markdown` 的声明版本改为 **0.7.17**（原先写 0.7.3，实际被 mikepenz 传递升级到
+- 行内构建器显式输出 `GFMTokenTypes.DOLLAR`：未识别成公式的 `$` 如果不输出就会被静默丢弃
+  （`时，$x$` 会渲染成 `时，x`）。
+- **链接点击只回调 `MarkdownConfig.onLinkClick`，库自身不再打开任何 URI**。
+  此前走的是第三方 renderer 的 `LocalUriHandler`，会绕过宿主的拦截直接拉起系统浏览器，
+  与 SECURITY.md 的威胁模型不符。
+- 视觉差异（相对第三方 renderer）：表格列宽改为按可用宽度均分、单元格允许折行（不再省略号截断）；
+  任务列表复选框改成 14dp 的小方框（不再占 48dp 触控区）；代码块顶栏的语言标签在左、复制按钮在右。
+- `org.jetbrains:markdown` 的声明版本改为 **0.7.17**（原先写 0.7.3，实际被第三方 renderer 传递升级到
   0.7.17）：两者的 `$` 识别规则不同 —— 0.7.1–0.7.3 不要求左界符前有空白，0.7.17 要求。
 - 构建脚本加 `@file:Suppress("DEPRECATION")`：Gradle 9.8 + CMP 1.12 起 `compose.runtime` 等
   便捷 DSL 被标记为 deprecated，而 Kotlin DSL 把 deprecation 当编译错误，改脚本会直接失败。

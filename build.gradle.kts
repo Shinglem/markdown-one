@@ -30,10 +30,6 @@ group = "io.github.shinglem"
 version = "0.1.0-SNAPSHOT"
 
 /** 依赖版本唯一处。改版本时同步 README「依赖」表。 */
-val vMikepenz = "0.46.0"
-// 0.7.17：mikepenz 0.46 会把它传递升级到 0.7.17，这里的声明必须与**实效**一致 ——
-// 0.7.3 与 0.7.17 对行内公式 `$` 的识别规则不同（后者要求左界符前是空白），
-// 写 0.7.3 会让人按错误行为推断（见 InlineMath.kt 的识别口径说明）。
 val vIntellijMarkdown = "0.7.17"
 val vHighlights = "1.1.0"
 val vCoil = "3.6.3"
@@ -58,13 +54,9 @@ kotlin {
             implementation(compose.material3)
             implementation(compose.ui)
 
-            // Markdown 解析（GFM AST）与块渲染的默认实现
+            // Markdown 解析（GFM AST）。0.7.3 与 0.7.17 对行内公式 `$` 的识别规则不同
+            // （后者要求左界符前是空白），行为说明见 InlineMath.kt。
             api("org.jetbrains:markdown:$vIntellijMarkdown")
-            implementation("com.mikepenz:multiplatform-markdown-renderer:$vMikepenz")
-            implementation("com.mikepenz:multiplatform-markdown-renderer-m3:$vMikepenz")
-            implementation("com.mikepenz:multiplatform-markdown-renderer-code:$vMikepenz")
-            // 图片块：core 的默认实现只有一个占位色块，真正加载图片要靠 -coil3 模块
-            implementation("com.mikepenz:multiplatform-markdown-renderer-coil3:$vMikepenz")
 
             implementation("dev.snipme:highlights:$vHighlights")
 

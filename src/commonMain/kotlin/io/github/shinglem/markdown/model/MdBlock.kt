@@ -9,7 +9,7 @@ import org.intellij.markdown.ast.ASTNode
  *
  * [raw] 是块的原始 Markdown 源码，**必须保留** —— 任何适配器渲染失败都能就地回落成源码。
  * [source] 是整篇文档的源码：GFM AST 节点的 offset 是**文档级**的，默认块渲染器
- * （mikepenz 的 element）会用 `source.substring(node.startOffset, node.endOffset)`，
+ * （`text/MdInline.kt` 与 `text/MdBlocks.kt`）会用 `source.substring(node.startOffset, node.endOffset)`，
  * 因此必须传整篇而非块片段，否则会越界。
  */
 public sealed interface MdBlock {

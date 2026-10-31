@@ -99,6 +99,8 @@ internal fun MdInlineText(
 ) {
     val inlineStyles = rememberMdInlineStyles()
     val inline = remember(source, children, inlineStyles) { buildMdInline(source, children, inlineStyles) }
+    // 只有 EOL / 标记 token 的片段会构建出空文本：不画，否则会多出一整行空白
+    if (inline.text.isEmpty() && inline.images.isEmpty()) return
     val density = LocalDensity.current
     val defaultColor = LocalMdColors.current.text
 
@@ -189,8 +191,11 @@ private fun MdInlineImage(image: MdImageRef, sizes: MutableMap<String, IntSize>,
     SideEffect {
         val success = state as? AsyncImagePainter.State.Success ?: return@SideEffect
         val result = success.result.image
-        if (result.width > 0 && result.height > 0) {
-            sizes[image.url] = IntSize(result.width, result.height)
+        val detected = IntSize(result.width, result.height)
+        // 只在真的变化时写：SnapshotStateMap 的 put 无条件记录写入，
+        // 每帧重写同一个值会把自己拖进无限重组。
+        if (detected.width > 0 && detected.height > 0 && sizes[image.url] != detected) {
+            sizes[image.url] = detected
         }
     }
     Image(

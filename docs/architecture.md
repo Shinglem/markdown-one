@@ -87,13 +87,46 @@ all                                // 显式注册 → ServiceLoader 发现 → 
 - 每个块用 `key(block.key)` 包裹，保证块的身份在重组间稳定。
 - 大块限高与缩放由 `BlockViewport` 在外面再包一层，见 [API · BlockViewportConfig](api.md#blockviewportconfig)。
 
+## 文本渲染层（`text/`）
+
+块内部的排版全是本库自己做的，**不依赖任何第三方 markdown renderer**。
+
+```
+AST 节点 ──buildMdInline()──▶ AnnotatedString + 需要 inline content 的图片
+                                   │
+                                   ▼
+                        BasicText(inlineContent = 公式表 + 图片表)
+```
+
+| 文件 | 职责 |
+|---|---|
+| `text/MdTheme.kt` | `MdColors` / `MdTypography` / `MdDimens` / `MdPadding` 与四个 CompositionLocal |
+| `text/MdInline.kt` | 行内构建器：strong / emph / 删除线 / 高亮 / 行内码 / 链接 / 自动链接 / 引用式链接 / 图片 / 软硬换行 / 转义 |
+| `text/MdText.kt` | `BasicText` + inline content 合成（整篇公式表 + 逐段图片占位） |
+| `text/MdBlocks.kt` | 段落 / 标题（ATX 与 setext）/ 分割线 / 引用 / 列表 / 流式分派 `MdFlow` |
+| `text/MdTable.kt` | 表格（列宽均分、表头分隔、对齐） |
+| `text/MdCodeBlock.kt` | 代码块外壳（语言标签 + 复制按钮 + 同步高亮） |
+
+几条必须遵守的约定：
+
+- **一次走完 AST**：构建行内文本只遍历一次，途中顺带处理公式与图片，
+  不对源码做二次字符串扫描 —— 否则行内码里的 `$x$` 会被当成公式。
+- **公式与图片走 inline content**：公式 key 是 `math:<tex>`（`collectInlineTexes` 与构建器
+  共用同一个 `inlineTex()` 取法），图片 key 是 `md_image:<url>`；找不到内容时 Compose
+  会退回 `alternateText`，也就是「降级成源码」而不是留空白。
+- **嵌套内容复用同一棵 AST**：引用体、列表项的块级子节点交给 `MdFlow` 分派，
+  不重新解析源码 —— 重新解析会产生新的块 key，把诊断面板的路由记录冲掉。
+- **`SelectionContainer` 只包一次**：在 `MarkdownText` 外层包，每个块各自包会让跨块选区断成多段。
+- **块间距**统一用 `MdPadding.block`，只此一处，改主题就能整体调松紧。
+
 ## 平台分层
 
 ```
-commonMain/                      解析、块模型、适配器 SPI、内置 Native 适配器、主题、视口
+commonMain/                      解析、块模型、适配器 SPI、内置 Native 适配器、文本渲染、主题、视口
  ├── adapter/BlockAdapter.kt     SPI
  ├── parse/                      JetBrains GFM AST → MdBlock
- ├── builtin/                    markdown / code / mermaid / source
+ ├── text/                       行内构建器与块组件（自研，零第三方 renderer）
+ ├── builtin/                    markdown / code / mermaid / html / details / source
  └── MarkdownText.kt             唯一入口
 
 desktopMain/                     只有平台差异

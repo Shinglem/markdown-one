@@ -89,9 +89,11 @@ MdBlock ──► AdapterRegistry
 
 | id | 格式 | 实现 |
 |---|---|---|
-| `builtin.markdown` | `markdown` | mikepenz 的 element composable |
+| `builtin.markdown` | `markdown` | 自研文本块渲染器：标题 / 段落 / 引用 / 列表 / 表格 / 分割线 |
 | `builtin.code` | `code:*` | Highlights + 8 组正则补丁 |
 | `builtin.mermaid` | `mermaid` / `code:mermaid` | `io.github.swithun-liu:mermaid-compose`（纯 Kotlin，无 WebView） |
+| `builtin.math` | `math` | `io.github.huarangmeng:latex-renderer`（仅 desktop） |
+| `builtin.html` / `builtin.details` | `html` / `details` | 剥壳后递归交回 `MarkdownText` |
 | `builtin.jcef` | `html` / `math` / `mermaid` | JCEF OSR（仅 desktop，`webFallback = Jcef` 时注册） |
 | `builtin.source` | `*` | 源码兜底 |
 
@@ -186,11 +188,14 @@ markdown-one/
 
 | 用途 | 坐标 | 版本 |
 |---|---|---|
-| GFM 解析 | `org.jetbrains:markdown` | 0.7.3 |
-| 块渲染 | `com.mikepenz:multiplatform-markdown-renderer(-m3/-code)` | 0.46.0 |
+| GFM 解析 | `org.jetbrains:markdown` | 0.7.17 |
 | 代码高亮 | `dev.snipme:highlights` | 1.1.0 |
 | 图片 | `io.coil-kt.coil3:coil-compose` / `coil-svg` | 3.6.3 |
 | 图表 | `io.github.swithun-liu:mermaid-compose` | 0.1.21 |
+| 公式 | `io.github.huarangmeng:latex-renderer`（仅 desktop） | 1.6.3 |
+
+文本与块的渲染（标题、段落、引用、列表、表格、分割线、行内格式）全部由本库 `text/` 包实现，
+**不依赖任何第三方 markdown renderer**。
 
 版本只在 `build.gradle.kts` 顶部出现一次，改版本时同步这张表。
 JCEF **不是**依赖：它经由 JBR 提供，运行期反射发现。

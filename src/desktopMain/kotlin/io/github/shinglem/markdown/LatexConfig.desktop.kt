@@ -16,7 +16,7 @@ import com.hrm.latex.renderer.model.LatexTheme
  * - 颜色取 markdown 正文色（固定主题，不用 `LatexTheme.auto`，避免 `isDarkTheme`
  *   与宿主主题不一致时重新测量）。
  *
- * 参数显式传入而不是读 CompositionLocal：`MarkdownText` 在铺 `LocalMarkdownColors`
+ * 参数显式传入而不是读 CompositionLocal：`MarkdownText` 在铺 `LocalMdColors`
  * 之前就要算行内公式的 inline content。
  */
 @Composable

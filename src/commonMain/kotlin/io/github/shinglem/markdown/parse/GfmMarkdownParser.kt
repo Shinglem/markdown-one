@@ -13,7 +13,7 @@ import org.intellij.markdown.parser.MarkdownParser as JetBrainsMarkdownParser
  * 基于 JetBrains markdown（GFM）的解析实现。
  *
  * 只负责「源码 → 块序列」，块内部的 inline 结构保持为 AST 节点，
- * 由默认块渲染器（mikepenz 的 element composable）消费。
+ * 由默认块渲染器（`text/MdInline.kt` 的行内构建器）消费。
  */
 public class GfmMarkdownParser : MarkdownParser {
 
