@@ -11,7 +11,15 @@
 
 - 行内公式的 annotator 不再在 `MarkdownTokenTypes.TEXT` 上兜底扫描 `$…$`：
   `CODE_SPAN` 的子节点同样是 `TEXT`，兜底会把行内代码里的 `$x$` 渲染成公式。
-  紧贴标点/文字的公式仍由 `parse/InlineMathRepair` 在解析后补成 `INLINE_MATH`。
+
+### 行为变更
+
+- **行内公式的识别口径与上游 0.7.17 对齐：`$` 前必须是空白或行首**。
+  紧贴中文标点/汉字的 `$…$`（如 `时，$\bar{x}$`）不再渲染成公式，按源码显示 ——
+  这与 GitHub/KaTeX 的宽松规则不同，是刻意选择（上游 #196 为修 #179 的货币误判引入）。
+  为此删除了 `parse/InlineMathRepair`（原先会把这批 `$…$` 补成 `INLINE_MATH`）。
+- annotator 接管 `GFMTokenTypes.DOLLAR` 并原样输出：未识别成公式的 `$` 在 mikepenz 的
+  `else` 分支里会被静默丢弃（`时，$x$` 会渲染成 `时，x`），接管后保持源码完整。
 - `org.jetbrains:markdown` 的声明版本改为 **0.7.17**（原先写 0.7.3，实际被 mikepenz 传递升级到
   0.7.17）：两者的 `$` 识别规则不同 —— 0.7.1–0.7.3 不要求左界符前有空白，0.7.17 要求。
 - 构建脚本加 `@file:Suppress("DEPRECATION")`：Gradle 9.8 + CMP 1.12 起 `compose.runtime` 等

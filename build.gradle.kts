@@ -32,13 +32,15 @@ version = "0.1.0-SNAPSHOT"
 /** 依赖版本唯一处。改版本时同步 README「依赖」表。 */
 val vMikepenz = "0.46.0"
 // 0.7.17：mikepenz 0.46 会把它传递升级到 0.7.17，这里的声明必须与**实效**一致 ——
-// 0.7.3 与 0.7.17 对行内公式 `$` 的识别规则不同（后者只在左界符前是空白时才认），
-// 写 0.7.3 会让人按错误行为推断（见 parse/InlineMathRepair 的说明）。
+// 0.7.3 与 0.7.17 对行内公式 `$` 的识别规则不同（后者要求左界符前是空白），
+// 写 0.7.3 会让人按错误行为推断（见 InlineMath.kt 的识别口径说明）。
 val vIntellijMarkdown = "0.7.17"
 val vHighlights = "1.1.0"
 val vCoil = "3.6.3"
 val vMermaidCmp = "0.1.21"
 val vJLatexMath = "1.0.7"
+/** 与 `gradle/libs.versions.toml` 的 `compose` 版本保持一致（仅用于 ui-test 坐标，宿主升级时同步）。 */
+val vCompose = "1.12.2"
 
 kotlin {
     jvm("desktop") {
@@ -84,6 +86,13 @@ kotlin {
         commonTest.dependencies {
             implementation(kotlin("test"))
             implementation(compose.runtime)
+        }
+
+        // desktop 专属测试：行内公式的输出要验证到真实 Compose 文本管线（需要 skiko 运行时）。
+        getByName("desktopTest").dependencies {
+            implementation(kotlin("test"))
+            implementation("org.jetbrains.compose.ui:ui-test:$vCompose")
+            implementation(compose.desktop.currentOs)
         }
     }
 }

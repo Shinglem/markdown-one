@@ -3,6 +3,7 @@ package io.github.shinglem.markdown.parse
 import io.github.shinglem.markdown.collectInlineTexes
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
@@ -10,6 +11,9 @@ import kotlin.test.assertTrue
  *
  * GFM 原生把 `$x$` 解析成 `INLINE_MATH` 节点（不是普通文本），所以 tex 只能从 AST 收集 ——
  * 收集与渲染必须用同一份字符串，否则 inline content 的 key 对不上，公式会退化成源码。
+ *
+ * **识别口径与上游 0.7.17 保持一致：`$` 前必须是空白或行首**（`canOpenMath`）。
+ * 紧贴中文标点/汉字的 `$…$` 不渲染公式，按源码显示 —— 我们刻意不做补偿。
  */
 class InlineMathTest {
 
@@ -30,21 +34,19 @@ class InlineMathTest {
     }
 
     @Test
-    fun `左界符紧贴标点时公式仍被收集`() {
-        // JetBrains 的规则要求 `$` 前是空白，`，$\bar{x}` 会被拆成散装 DOLLAR 节点，需要修复。
+    fun `只有前导空白的公式被收集`() {
+        // 第一个公式前是空格 → INLINE_MATH；第二个紧贴中文逗号 → 0.7.17 不认，保留成 DOLLAR。
         val document = parser.parse("行内: 当 \$n \\to \\infty\$ 时，\$\\bar{x} \\to \\mu\$。", streaming = false)
         val source = document.blocks.first().source
-        assertEquals(
-            setOf("n \\to \\infty", "\\bar{x} \\to \\mu"),
-            collectInlineTexes(document.blocks, source),
-        )
+        assertEquals(setOf("n \\to \\infty"), collectInlineTexes(document.blocks, source))
     }
 
     @Test
-    fun `修复后的公式是 INLINE_MATH 节点`() {
+    fun `紧贴标点的公式保留成普通美元符`() {
         val block = parser.parse("时，\$\\bar{x}\$。", streaming = false).blocks.single()
         val types = flatten(block.node).map { it.type.toString() }
-        assertTrue(types.any { it.contains("INLINE_MATH") }, "AST 里应有 INLINE_MATH，实际=$types")
+        assertFalse(types.any { it.contains("INLINE_MATH") }, "0.7.17 要求前导空白，实际=$types")
+        assertEquals(2, types.count { it.contains("DOLLAR") }, "两个美元符都应保留，实际=$types")
     }
 
     @Test
