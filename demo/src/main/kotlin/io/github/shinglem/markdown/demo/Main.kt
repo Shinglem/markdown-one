@@ -38,10 +38,7 @@ import io.github.shinglem.markdown.WebFallback
 import io.github.shinglem.markdown.outsidePaperTheme
 import io.github.shinglem.markdown.adapter.AdapterDiagnostics
 import io.github.shinglem.markdown.adapter.AdapterKind
-import io.github.shinglem.markdown.adapter.BlockAdapter
 import io.github.shinglem.markdown.adapter.FormatId
-import io.github.shinglem.markdown.adapter.Formats
-import io.github.shinglem.markdown.model.MdBlock
 
 private data class Fixture(val name: String, val markdown: String, val streaming: Boolean = false)
 
@@ -178,6 +175,61 @@ private val FIXTURES = listOf(
         断行位置应当由文本引擎决定，而不是按固定字宽估算。
         """.trimIndent(),
     ),
+    // 公式 fixture 用 `§` 代替 `$`，避免 Kotlin raw string 里的模板插值（替换在 trimIndent 之后做）。
+    //
+    // 已知限制：JLaTeXMath 1.0.7 在 JDK 25+ 上把 `\Omega` / `\varOmega` 渲染成空白
+    // （字形槽位 173 = U+00AD 被 JDK 当作隐形字符，见 opencollab/jlatexmath#111，未修复），
+    // 所以样例里用 `\Sigma` / `\Psi` 代替。其它大写希腊字母正常。
+    Fixture(
+        "公式",
+        """
+        # 公式渲染
+
+        ## 一、行内公式（`§…§`，`§` 前留空格才会识别）
+
+        爱因斯坦质能方程 §E = mc^2§，欧拉恒等式 §e^{i\pi} + 1 = 0§。
+
+        分式 §\frac{a+b}{c}§、根号 §\sqrt{x^2 + y^2}§、求和 §\sum_{i=1}^{n} i = \frac{n(n+1)}{2}§。
+
+        希腊字母 §\alpha, \beta, \gamma, \Delta, \Sigma, \Psi§；关系符 §\leq, \geq, \neq, \approx§。
+
+        **粗体里的公式 §\int_0^1 x^2\,dx = \frac{1}{3}§ 也应正常。**
+
+        ## 二、紧贴标点（按源码显示）
+
+        当 §n \to \infty§ 时，§\bar{x} \to \mu§。
+
+        上面第二个公式紧贴中文逗号，按 0.7.17 的 `canOpenMath` 规则不渲染，
+        保留成源码（与上游一致，刻意不补偿）。
+
+        ## 三、行内代码里的美元符
+
+        价格写作 `§100` 与 `§200`，不应变成公式。
+
+        ## 四、块级公式（`§§…§§`）
+
+        §§
+        f(x) = \int_{-\infty}^{\infty} \hat{f}(\xi)\, e^{2\pi i \xi x}\, d\xi
+        §§
+
+        §§
+        \begin{pmatrix} a & b \\ c & d \end{pmatrix}
+        \begin{pmatrix} x \\ y \end{pmatrix}
+        =
+        \begin{pmatrix} ax + by \\ cx + dy \end{pmatrix}
+        §§
+
+        §§
+        \sum_{k=1}^{n} k^2 = \frac{n(n+1)(2n+1)}{6}
+        §§
+
+        ## 五、语法不支持时
+
+        §§
+        \undefinedcommand{x}
+        §§
+        """.trimIndent().replace('§', '$'),
+    ),
     Fixture(
         "基础语法",
         """
@@ -286,41 +338,6 @@ private val FIXTURES = listOf(
 )
 
 /**
- * 演示「自己写一个适配器」：接管数学公式块。
- *
- * 真实项目里这里可以换成 KaTeX/JCEF/原生排版；本 demo 只证明扩展点可用 ——
- * 注册后右侧路由面板会显示 `math → demo.math (Native)`。
- */
-private class DemoMathAdapter : BlockAdapter {
-    override val id: String = "demo.math"
-    override val kind: AdapterKind = AdapterKind.Native
-    override val priority: Int = 120
-
-    override fun formats(): Set<FormatId> = setOf(Formats.Math)
-
-    override fun isAvailable(): Boolean = true
-
-    override fun canRender(block: MdBlock): Boolean = block is MdBlock.Math
-
-    @Composable
-    override fun Render(block: MdBlock, modifier: Modifier) {
-        val math = block as MdBlock.Math
-        Column(modifier.padding(vertical = 4.dp)) {
-            Text(
-                text = "公式（demo 未配置渲染器）",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                text = math.tex,
-                style = MaterialTheme.typography.bodyMedium,
-                fontFamily = FontFamily.Monospace,
-            )
-        }
-    }
-}
-
-/**
  * sandbox：左 fixture、中渲染、右**适配器路由面板**。
  *
  * 路由面板是这套架构最重要的自检工具 —— 每个块命中了哪个适配器、什么优先级、什么类型，
@@ -366,7 +383,6 @@ private fun DemoScreen() {
 
     val config = remember(theme, initialZoom) {
         MarkdownConfig(
-            adapters = listOf(DemoMathAdapter()),
             // 开关演示：原始 HTML 块交给 JCEF 渲染；运行环境没有 org.cef 时自动退回源码。
             webFallback = WebFallback.Jcef,
             allowRawHtml = true,

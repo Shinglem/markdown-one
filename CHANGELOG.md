@@ -12,6 +12,12 @@
 - 行内公式的 annotator 不再在 `MarkdownTokenTypes.TEXT` 上兜底扫描 `$…$`：
   `CODE_SPAN` 的子节点同样是 `TEXT`，兜底会把行内代码里的 `$x$` 渲染成公式。
 
+### 已知问题
+
+- JLaTeXMath 1.0.7 在 **JDK 25+** 上把 `\Omega` / `\varOmega` 渲染成空白（字形槽位 173
+  = U+00AD 被 JDK 当作隐形字符，见 [opencollab/jlatexmath#111](https://github.com/opencollab/jlatexmath/issues/111)，
+  未修复，1.0.8-SNAPSHOT 同样受影响）；其它大写希腊字母正常。
+
 ### 行为变更
 
 - **行内公式的识别口径与上游 0.7.17 对齐：`$` 前必须是空白或行首**。
