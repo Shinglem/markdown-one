@@ -14,6 +14,15 @@
 
 ### 变更
 
+- **嵌套在引用 / 列表里的块交回适配器链**：`text/MdBlocks.kt` 的 `MdRoutedBlock` 不再用写死的
+  `when` 处理嵌套块，而是复用 `parse/MdBlockFactory`（解析器与渲染层共用一份 AST → `MdBlock` 映射）
+  与同一个 `AdapterRegistry`。因此：
+  - 引用里的 `$$…$$` 会真正排版（`BLOCK_QUOTE > PARAGRAPH > BLOCK_MATH` 这一层也会被拆开处理）；
+  - 列表项里的 mermaid 会出图（以前退化成普通代码块）；
+  - 嵌套表格 / 分割线 / HTML 块与顶层表现一致；
+  - 全落空时由 `builtin.source` 兜底显示源码，绝不静默丢内容。
+- **引用内块级公式的 TeX 会剥掉 `>` 前缀**：`BLOCK_MATH` 节点在引用里会把行首的块引用标记圈进
+  offset，直接取 raw 会带着 `>` 去排版，必然失败退化成源码（`MdBlockFactory.mathTex`）。
 - **移除 `com.mikepenz:multiplatform-markdown-renderer*` 全部 4 个依赖**，文本与块渲染改为自研
   `io.github.shinglem.markdown.text` 包：
   - `MdInline`：一次走完 AST 生成 `AnnotatedString`（strong / emph / 删除线 / 高亮 / 行内码 /

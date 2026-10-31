@@ -116,6 +116,11 @@ AST 节点 ──buildMdInline()──▶ AnnotatedString + 需要 inline conten
   会退回 `alternateText`，也就是「降级成源码」而不是留空白。
 - **嵌套内容复用同一棵 AST**：引用体、列表项的块级子节点交给 `MdFlow` 分派，
   不重新解析源码 —— 重新解析会产生新的块 key，把诊断面板的路由记录冲掉。
+- **嵌套块走同一条适配器链**：`MdFlow` 只按「行内片段 / 块级节点」分块，
+  块级节点交给 `MdRoutedBlock` → `parse/MdBlockFactory` → `AdapterRegistry.select()`，
+  和顶层用的是同一份映射与同一个注册表。这样引用里的 `$$…$$`、列表里的 mermaid、
+  嵌套表格都复用已有适配器，不必在渲染层维护第二张类型表。
+  只有标题 / 段落 / 列表 / 引用留在本地处理 —— 它们要接收父级的行内样式（如 `typography.quote`）。
 - **`SelectionContainer` 只包一次**：在 `MarkdownText` 外层包，每个块各自包会让跨块选区断成多段。
 - **块间距**统一用 `MdPadding.block`，只此一处，改主题就能整体调松紧。
 

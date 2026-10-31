@@ -222,7 +222,28 @@ private val FIXTURES = listOf(
         \sum_{k=1}^{n} k^2 = \frac{n(n+1)(2n+1)}{6}
         §§
 
-        ## 五、语法不支持时
+        ## 五、嵌套在引用与列表里
+
+        > 引用里的行内公式 §a^2 + b^2 = c^2§ 与块级公式：
+        >
+        > §§
+        > \int_0^{\pi} \sin x\, dx = 2
+        > §§
+
+        - 列表项里的块级公式：
+
+          §§
+          e^{i\pi} = -1
+          §§
+
+        - 列表项里的 mermaid：
+
+          ```mermaid
+          flowchart LR
+            A[开始] --> B[结束]
+          ```
+
+        ## 六、语法不支持时
 
         §§
         \undefinedcommand{x}

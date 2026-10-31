@@ -18,6 +18,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -36,6 +37,9 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.github.shinglem.markdown.adapter.AdapterRegistry
+import io.github.shinglem.markdown.adapter.LocalIsStreaming
+import io.github.shinglem.markdown.parse.MdBlockFactory
 import org.intellij.markdown.IElementType
 import org.intellij.markdown.MarkdownElementTypes
 import org.intellij.markdown.MarkdownTokenTypes
@@ -269,6 +273,9 @@ private fun bulletFor(depth: Int): String = when (depth % 3) {
     else -> "•"
 }
 
+/** 嵌套块的适配器链。由 [MarkdownText][io.github.shinglem.markdown.MarkdownText] 提供。 */
+internal val LocalMdAdapterRegistry = staticCompositionLocalOf<AdapterRegistry?> { null }
+
 /**
  * 把一组子节点渲染成流式内容。
  *
@@ -287,7 +294,7 @@ internal fun MdFlow(
         chunks.forEach { chunk ->
             when (chunk) {
                 is MdChunk.Inline -> MdInlineText(source, chunk.nodes, style, Modifier.fillMaxWidth())
-                is MdChunk.Block -> MdBlockNode(source, chunk.node, depth)
+                is MdChunk.Block -> MdBlockNode(source, chunk.node, depth, style)
             }
         }
     }
@@ -340,13 +347,19 @@ private fun isBlockNode(type: IElementType): Boolean = headingLevelOf(type) != n
 }
 
 @Composable
-private fun MdBlockNode(source: String, node: ASTNode, depth: Int) {
-    val typography = LocalMdTypography.current
+private fun MdBlockNode(source: String, node: ASTNode, depth: Int, inlineStyle: TextStyle) {
     val headingLevel = headingLevelOf(node.type)
     when {
         headingLevel != null -> MdHeading(source, node, headingLevel, Modifier.fillMaxWidth())
-        node.type == MarkdownElementTypes.PARAGRAPH ->
-            MdInlineText(source, node.children, typography.paragraph, Modifier.fillMaxWidth())
+        node.type == MarkdownElementTypes.PARAGRAPH -> {
+            // 段落里可能夹着块级节点（引用中的 `$$…$$` 是 `BLOCK_QUOTE > PARAGRAPH > BLOCK_MATH`）：
+            // 一律交给 MdFlow 分块，否则块级公式会被当成行内文本原样输出。
+            if (node.children.any { isBlockNode(it.type) }) {
+                MdFlow(source, node.children, inlineStyle, depth)
+            } else {
+                MdInlineText(source, node.children, inlineStyle, Modifier.fillMaxWidth())
+            }
+        }
 
         node.type == MarkdownElementTypes.UNORDERED_LIST ->
             MdList(source, node, ordered = false, depth = depth + 1)
@@ -355,16 +368,29 @@ private fun MdBlockNode(source: String, node: ASTNode, depth: Int) {
             MdList(source, node, ordered = true, depth = depth + 1)
 
         node.type == MarkdownElementTypes.BLOCK_QUOTE -> MdQuote(source, node, depth = depth + 1)
+        // 其余块（代码/mermaid、表格、分割线、块级公式、HTML）交回适配器链：
+        // 嵌套位置与顶层的渲染结果因此一致，也不用在这里维护第二张类型表。
+        else -> MdRoutedBlock(source, node)
+    }
+}
 
-        node.type == MarkdownElementTypes.CODE_FENCE || node.type == MarkdownElementTypes.CODE_BLOCK -> {
-            val (code, language) = codeOf(source, node)
-            MdCodeBlock(code = code, language = language, modifier = Modifier.fillMaxWidth())
-        }
-
-        node.type == MarkdownTokenTypes.HORIZONTAL_RULE -> MdRule(Modifier.fillMaxWidth())
-        node.type == GFMElementTypes.TABLE -> MdTable(source, node, Modifier.fillMaxWidth())
-        // 嵌套层级里的 HTML / 块级公式没有对应的原生组件：显示源码，不留空白
-        else -> MdSource(source.substring(node.startOffset, node.endOffset), Modifier.fillMaxWidth())
+/**
+ * 把一个嵌套块交回适配器链。
+ *
+ * 复用 `MdBlockFactory` 与顶层同一份节点映射、同一个 [AdapterRegistry]，
+ * 所以引用里的 `$$…$$`、列表里的 mermaid、嵌套表格都走各自的内置适配器；
+ * 全落空时由 `builtin.source`（`Formats.Any`）兜底显示源码，绝不静默丢内容。
+ */
+@Composable
+private fun MdRoutedBlock(source: String, node: ASTNode) {
+    val registry = LocalMdAdapterRegistry.current
+    val streaming = LocalIsStreaming.current
+    val block = remember(source, node) { MdBlockFactory.of(source, node, "n${node.startOffset}") }
+    val adapter = remember(registry, block, streaming) { block?.let { registry?.select(it, streaming) } }
+    if (block != null && adapter != null) {
+        adapter.Render(block, Modifier.fillMaxWidth())
+    } else {
+        MdSource(source.substring(node.startOffset, node.endOffset), Modifier.fillMaxWidth())
     }
 }
 

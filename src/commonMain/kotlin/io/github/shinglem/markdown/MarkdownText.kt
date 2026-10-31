@@ -16,6 +16,7 @@ import androidx.compose.ui.text.style.TextAlign
 import io.github.shinglem.markdown.adapter.LocalIsStreaming
 import io.github.shinglem.markdown.adapter.buildAdapterRegistry
 import io.github.shinglem.markdown.parse.GfmMarkdownParser
+import io.github.shinglem.markdown.text.LocalMdAdapterRegistry
 import io.github.shinglem.markdown.text.LocalMdColors
 import io.github.shinglem.markdown.text.LocalMdDimens
 import io.github.shinglem.markdown.text.LocalMdMathContent
@@ -86,6 +87,7 @@ public fun MarkdownText(
             LocalMdPadding provides padding,
             LocalMdMathContent provides mathContents,
             LocalMdReferences provides references,
+            LocalMdAdapterRegistry provides registry,
             LocalMdOnLinkClick provides config.onLinkClick,
             LocalMdMaxSyncHighlightLength provides config.maxSyncHighlightLength,
         ) {
