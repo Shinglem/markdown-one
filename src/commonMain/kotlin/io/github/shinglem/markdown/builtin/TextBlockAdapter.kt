@@ -9,7 +9,9 @@ import io.github.shinglem.markdown.adapter.FormatId
 import io.github.shinglem.markdown.adapter.Formats
 import io.github.shinglem.markdown.model.MdBlock
 import io.github.shinglem.markdown.text.MdHeading
+import io.github.shinglem.markdown.text.MdList
 import io.github.shinglem.markdown.text.MdParagraph
+import io.github.shinglem.markdown.text.MdQuote
 import io.github.shinglem.markdown.text.MdRule
 
 /**
@@ -46,6 +48,8 @@ internal class TextBlockAdapter(@Suppress("unused") private val config: Markdown
             is MdBlock.Heading -> MdHeading(block.source, block.node, block.level, modifier)
             is MdBlock.Paragraph -> MdParagraph(block.source, block.node, modifier)
             is MdBlock.Rule -> MdRule(modifier)
+            is MdBlock.Quote -> MdQuote(block.source, block.node, modifier)
+            is MdBlock.ListBlock -> MdList(block.source, block.node, block.ordered, modifier)
             else -> SourceFallbackAdapter.Render(block, modifier)
         }
     }
