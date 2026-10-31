@@ -49,6 +49,13 @@ public fun MarkdownText(
     config: MarkdownConfig = MarkdownConfig(),
     textAlign: TextAlign? = null,
     fillWidth: Boolean = true,
+    /**
+     * 是否包一层 [SelectionContainer]。
+     *
+     * 关掉有实际用途：流式输出时内容每几十毫秒变一次，选区与拖动手柄反复重建会闪烁；
+     * 宿主可以在「正在接收」的那条消息上关掉，稳定后再打开。
+     */
+    selectable: Boolean = true,
 ) {
     val registry = remember(config) { buildAdapterRegistry(config) }
     val document = remember(markdown, streaming) { GfmMarkdownParser().parse(markdown, streaming) }
@@ -92,7 +99,7 @@ public fun MarkdownText(
             LocalMdMaxSyncHighlightLength provides config.maxSyncHighlightLength,
         ) {
             // 选择框只包一次：每块一个 SelectionContainer 会让跨块选区断成若干段。
-            SelectionContainer {
+            val content: @Composable () -> Unit = {
                 Column(if (fillWidth) Modifier.fillMaxWidth() else Modifier) {
                     document.blocks.forEach { block ->
                         val adapter = registry.select(block, streaming)
@@ -102,21 +109,22 @@ public fun MarkdownText(
                                 config.diagnostics.onRoute(block.key, block.formats, adapter.id, adapter.kind)
                             }
                             key(block.key) {
-                                val content: @Composable () -> Unit = {
+                                val blockContent: @Composable () -> Unit = {
                                     adapter.Render(block, if (fillWidth) Modifier.fillMaxWidth() else Modifier)
                                 }
                                 val needsViewport = config.viewport.enabled &&
                                     config.viewport.matches(block.formats.map { it.value }.toSet())
                                 if (needsViewport) {
-                                    BlockViewport(config.viewport, content)
+                                    BlockViewport(config.viewport, blockContent)
                                 } else {
-                                    content()
+                                    blockContent()
                                 }
                             }
                         }
                     }
                 }
             }
+            if (selectable) SelectionContainer(content = content) else content()
         }
     }
 }
