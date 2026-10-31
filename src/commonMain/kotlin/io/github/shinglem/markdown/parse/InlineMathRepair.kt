@@ -18,6 +18,11 @@ import org.intellij.markdown.flavours.gfm.GFMTokenTypes
  * 渲染出来就是原样的 `$\bar{x} \to \mu$`（只有第一个公式正常）。这里把相邻的一对
  * `DOLLAR` 之间的内容包成一个 `INLINE_MATH` 节点，offset 与原文保持一致 ——
  * 下游（annotator、tex 收集）都按 offset 取文本，因此不需要改动源码。
+ *
+ * 版本备注（实测，别按印象推断）：0.7.1 / 0.7.2 / 0.7.3 的 lexer **不要求**前导空白，
+ * `时，$x$`、`a$x$b`、`开头$\alpha$结尾` 都直接是 `INLINE_MATH`；限制是 **0.7.17** 才加的。
+ * 本仓库声明与实际的依赖版本都是 0.7.17（`build.gradle.kts` 的 `vIntellijMarkdown`），
+ * 所以这个补丁是必需的，不是历史遗留 —— 删掉它上面那段示例就会退回显示源码。
  */
 internal fun repairInlineMath(node: ASTNode, source: String): ASTNode {
     if (node.children.isEmpty()) return node

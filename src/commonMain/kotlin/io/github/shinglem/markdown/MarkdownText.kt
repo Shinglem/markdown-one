@@ -67,7 +67,7 @@ public fun MarkdownText(
     val source = document.blocks.firstOrNull()?.source ?: markdown
     val inlineTexes = remember(document.blocks) { collectInlineTexes(document.blocks, source) }
     val mathContents = mathInlineContents(inlineTexes)
-    val annotator = rememberMathAnnotator(mathContents)
+    val annotator = rememberMathAnnotator()
     val inlineContent = markdownInlineContent(mathContents)
 
     // 主题可在运行时切换（明暗），所以逐个取 CompositionLocal 当前值，而不是写死默认。

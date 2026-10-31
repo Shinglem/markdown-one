@@ -1,5 +1,14 @@
+@file:Suppress("DEPRECATION")
+
 // ============================================================================
 //  markdown-one · 核心库（仓库根 = 库本体）
+//  ---------------------------------------------------------------------------
+//  为什么 @file:Suppress("DEPRECATION")：
+//   Gradle 9.8 + CMP 1.12 起，`compose.runtime` / `compose.material3` / `compose.ui` 等
+//   便捷 DSL 被标记为 deprecated，而 Kotlin DSL 把 deprecation 当**编译错误**。
+//   这些必须继续用 DSL：material3 在 CMP 1.12.2 没有同版本的显式坐标
+//   （org.jetbrains.compose.material3:material3 稳定版止于 1.9.0）。宿主
+//   `composeApp/build.gradle.kts` 用的是同一套写法，保持一致。
 //  ---------------------------------------------------------------------------
 //  · 被宿主工程以 submodule 挂载时，本脚本作为 :modules/markdown-one 子项目执行；
 //    那时 `libs` 指向**宿主**的 version catalog，所以：
@@ -22,7 +31,10 @@ version = "0.1.0-SNAPSHOT"
 
 /** 依赖版本唯一处。改版本时同步 README「依赖」表。 */
 val vMikepenz = "0.46.0"
-val vIntellijMarkdown = "0.7.3"
+// 0.7.17：mikepenz 0.46 会把它传递升级到 0.7.17，这里的声明必须与**实效**一致 ——
+// 0.7.3 与 0.7.17 对行内公式 `$` 的识别规则不同（后者只在左界符前是空白时才认），
+// 写 0.7.3 会让人按错误行为推断（见 parse/InlineMathRepair 的说明）。
+val vIntellijMarkdown = "0.7.17"
 val vHighlights = "1.1.0"
 val vCoil = "3.6.3"
 val vMermaidCmp = "0.1.21"

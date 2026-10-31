@@ -7,6 +7,16 @@
 
 尚未发布到 Maven Central，当前以 git submodule / 本地构建接入。
 
+### 修复
+
+- 行内公式的 annotator 不再在 `MarkdownTokenTypes.TEXT` 上兜底扫描 `$…$`：
+  `CODE_SPAN` 的子节点同样是 `TEXT`，兜底会把行内代码里的 `$x$` 渲染成公式。
+  紧贴标点/文字的公式仍由 `parse/InlineMathRepair` 在解析后补成 `INLINE_MATH`。
+- `org.jetbrains:markdown` 的声明版本改为 **0.7.17**（原先写 0.7.3，实际被 mikepenz 传递升级到
+  0.7.17）：两者的 `$` 识别规则不同 —— 0.7.1–0.7.3 不要求左界符前有空白，0.7.17 要求。
+- 构建脚本加 `@file:Suppress("DEPRECATION")`：Gradle 9.8 + CMP 1.12 起 `compose.runtime` 等
+  便捷 DSL 被标记为 deprecated，而 Kotlin DSL 把 deprecation 当编译错误，改脚本会直接失败。
+
 ## [0.1.0] - 2026-10-30
 
 首个可用版本。目标多端，当前只实现 desktop（JVM）。

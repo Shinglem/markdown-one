@@ -55,6 +55,15 @@ class InlineMathTest {
     }
 
     @Test
+    fun `行内代码里的美元符号不算公式`() {
+        // CODE_SPAN 的内容是 TEXT 而不是 INLINE_MATH；annotator 也不在 TEXT 上兜底扫描，
+        // 否则 `` `$x$` `` 会被当成公式渲染。
+        val document = parser.parse("行内`\$x\$`代码与 \$y\$。", streaming = false)
+        val source = document.blocks.first().source
+        assertEquals(setOf("y"), collectInlineTexes(document.blocks, source))
+    }
+
+    @Test
     fun `没有公式时集合为空`() {
         val document = parser.parse("普通段落，价格 \$100。", streaming = false)
         val source = document.blocks.first().source
