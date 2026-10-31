@@ -73,7 +73,8 @@ internal fun MdCodeBlock(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = language?.takeIf { it.isNotBlank() } ?: "",
+                // 与既有观感对齐：语言标签统一大写（宿主快照/测试按 `KOTLIN` 断言）。
+                text = language?.trim()?.takeIf { it.isNotBlank() }?.uppercase() ?: "",
                 style = typography.code.copy(fontSize = 12.sp),
                 color = colors.text.copy(alpha = 0.6f),
                 maxLines = 1,
