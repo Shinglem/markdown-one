@@ -38,7 +38,8 @@ val vIntellijMarkdown = "0.7.17"
 val vHighlights = "1.1.0"
 val vCoil = "3.6.3"
 val vMermaidCmp = "0.1.21"
-val vJLatexMath = "1.0.7"
+/** 公式排版引擎（io.github.huarangmeng，MIT）：Compose 原生矢量绘制 + KaTeX 字体。 */
+val vLatex = "1.6.3"
 /** 与 `gradle/libs.versions.toml` 的 `compose` 版本保持一致（仅用于 ui-test 坐标，宿主升级时同步）。 */
 val vCompose = "1.12.2"
 
@@ -76,11 +77,11 @@ kotlin {
             implementation("io.github.swithun-liu:mermaid-compose:$vMermaidCmp")
         }
 
-        // 公式排版：JLaTeXMath 是纯 Java 的 LaTeX 排版引擎（Apache-2.0），
-        // 直接画到 AWT Graphics2D，再转 ImageBitmap —— 不需要 WebView / JCEF。
-        // 只在 desktop 注册适配器，其它 target 保持源码兜底。
+        // 公式排版：latex-renderer 是纯 Compose 的 LaTeX 引擎（矢量绘制 + KaTeX 字体），
+        // 无需 AWT / WebView；行内与块级共用同一套测量与主题。
         desktopMain.dependencies {
-            implementation("org.scilab.forge:jlatexmath:$vJLatexMath")
+            implementation("io.github.huarangmeng:latex-renderer:$vLatex")
+            implementation("io.github.huarangmeng:latex-fonts-katex:$vLatex")
         }
 
         commonTest.dependencies {

@@ -8,7 +8,7 @@ import io.github.shinglem.markdown.web.JcefAdapter
 /**
  * desktop 专有适配器。
  *
- * - **公式**：JLaTeXMath 原生排版（不需要浏览器），始终注册；
+ * - **公式**：`latex-renderer` 原生排版（Compose 矢量绘制，不需要浏览器），始终注册；
  * - **JCEF**：只在开关打开时注册；即使注册了，运行环境没有 `org.cef` 也会因
  *   [BlockAdapter.isAvailable] 为 false 而被路由跳过。
  *

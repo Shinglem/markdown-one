@@ -177,9 +177,8 @@ private val FIXTURES = listOf(
     ),
     // 公式 fixture 用 `§` 代替 `$`，避免 Kotlin raw string 里的模板插值（替换在 trimIndent 之后做）。
     //
-    // 已知限制：JLaTeXMath 1.0.7 在 JDK 25+ 上把 `\Omega` / `\varOmega` 渲染成空白
-    // （字形槽位 173 = U+00AD 被 JDK 当作隐形字符，见 opencollab/jlatexmath#111，未修复），
-    // 所以样例里用 `\Sigma` / `\Psi` 代替。其它大写希腊字母正常。
+    // 公式由 `io.github.huarangmeng:latex-renderer` 排版（Compose 矢量绘制 + KaTeX 字体），
+    // 大写希腊字母（含 `\Omega`）与 `\begin{pmatrix}` 都正常。
     Fixture(
         "公式",
         """
@@ -191,7 +190,7 @@ private val FIXTURES = listOf(
 
         分式 §\frac{a+b}{c}§、根号 §\sqrt{x^2 + y^2}§、求和 §\sum_{i=1}^{n} i = \frac{n(n+1)}{2}§。
 
-        希腊字母 §\alpha, \beta, \gamma, \Delta, \Sigma, \Psi§；关系符 §\leq, \geq, \neq, \approx§。
+        希腊字母 §\alpha, \beta, \gamma, \Delta, \Omega, \Psi§；关系符 §\leq, \geq, \neq, \approx§。
 
         **粗体里的公式 §\int_0^1 x^2\,dx = \frac{1}{3}§ 也应正常。**
 

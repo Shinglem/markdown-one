@@ -1,9 +1,7 @@
 package io.github.shinglem.markdown.builtin
 
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
@@ -12,33 +10,31 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.toComposeImageBitmap
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import com.hrm.latex.renderer.Latex
+import com.hrm.latex.renderer.measure.rememberLatexMeasurer
+import com.mikepenz.markdown.compose.LocalMarkdownColors
+import com.mikepenz.markdown.compose.LocalMarkdownTypography
 import io.github.shinglem.markdown.MarkdownConfig
 import io.github.shinglem.markdown.adapter.AdapterKind
 import io.github.shinglem.markdown.adapter.BlockAdapter
 import io.github.shinglem.markdown.adapter.FormatId
 import io.github.shinglem.markdown.adapter.Formats
 import io.github.shinglem.markdown.model.MdBlock
-import org.scilab.forge.jlatexmath.TeXConstants
-import org.scilab.forge.jlatexmath.TeXFormula
-import java.awt.RenderingHints
-import java.awt.image.BufferedImage
+import io.github.shinglem.markdown.rememberLatexConfig
 
 /**
- * 数学公式（`$...$` / `$$...$$`）：**纯 JVM 排版，不引 WebView / JCEF**。
+ * 数学公式（`$$...$$` 块）：**纯 Compose 排版，不引 WebView**。
  *
- * 排版交给 JLaTeXMath（Apache-2.0，Scilab 维护的 LaTeX 引擎），它把公式画到
- * AWT `Graphics2D`，这里转成 `ImageBitmap` 交给 Compose。
+ * 排版交给 `io.github.huarangmeng:latex-renderer`（MIT，KaTeX 字体 + 矢量绘制），
+ * 与行内公式共用 [rememberLatexConfig]，字号/颜色跟随文档主题。
  *
- * 只在 desktop 注册（见 `PlatformAdapters.desktop.kt`）：其它 target 没有 AWT，
- * 会落到 `builtin.source` 显示 TeX 源码。
+ * 只在 desktop 注册（见 `PlatformAdapters.desktop.kt`）：其它 target 会落到
+ * `builtin.source` 显示 TeX 源码。
  *
- * 渲染失败（语法不支持）时**显示源码 + 提示**，不做静默替换。
+ * 先用 `measure()` 判一次能不能排版：失败时**显示源码 + 提示**，不做静默替换
+ * （`Latex()` 自己遇到不支持的语法只会画空白）。
  */
 internal class DesktopMathAdapter(private val config: MarkdownConfig) : BlockAdapter {
 
@@ -55,12 +51,16 @@ internal class DesktopMathAdapter(private val config: MarkdownConfig) : BlockAda
     @Composable
     override fun Render(block: MdBlock, modifier: Modifier) {
         val math = block as MdBlock.Math
-        val density = LocalDensity.current
-        val color = MaterialTheme.colorScheme.onSurface
-        val image = remember(math.tex, math.display, density.density, color) {
-            renderMathImage(math.tex, math.display, density.density, color)
+        val latexConfig = rememberLatexConfig(
+            color = LocalMarkdownColors.current.text,
+            fontSize = LocalMarkdownTypography.current.text.fontSize,
+        )
+        val measurer = rememberLatexMeasurer(latexConfig)
+        val dimensions = remember(measurer, math.tex, latexConfig) {
+            measurer.measure(math.tex, latexConfig)
         }
-        if (image == null) {
+
+        if (dimensions == null) {
             Column(modifier.fillMaxWidth().padding(vertical = 4.dp)) {
                 Text(
                     text = config.mathFallbackText,
@@ -75,21 +75,13 @@ internal class DesktopMathAdapter(private val config: MarkdownConfig) : BlockAda
             }
             return
         }
-        if (math.display) {
-            Column(
-                modifier.fillMaxWidth().padding(vertical = 6.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Image(bitmap = image.bitmap, contentDescription = math.tex)
-            }
-        } else {
-            Row(
-                modifier = modifier,
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(3.dp),
-            ) {
-                Image(bitmap = image.bitmap, contentDescription = math.tex)
-            }
+
+        Box(
+            modifier.fillMaxWidth().padding(vertical = 6.dp),
+            contentAlignment = if (math.display) Alignment.Center else Alignment.CenterStart,
+        ) {
+            Latex(latex = math.tex, config = latexConfig)
         }
     }
 }
+

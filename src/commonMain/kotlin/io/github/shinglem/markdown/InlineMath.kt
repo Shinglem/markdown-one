@@ -4,6 +4,8 @@ import androidx.compose.foundation.text.InlineTextContent
 import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.TextUnit
 import com.mikepenz.markdown.model.MarkdownAnnotator
 import com.mikepenz.markdown.model.markdownAnnotator
 import io.github.shinglem.markdown.model.MdBlock
@@ -42,15 +44,20 @@ private fun inlineTex(source: String, node: ASTNode): String =
 /**
  * 行内公式的 [InlineTextContent]：按 tex 建表，渲染器由平台提供。
  *
- * desktop 用 JLaTeXMath 出位图；其它端返回空表 —— 那时 annotator 里的
+ * desktop 用 `latex-renderer` 直接产出 inline content；其它端返回空表 —— 那时 annotator 里的
  * `appendInlineContent` 找不到 key，Compose 会退回 `alternateText`（即 TeX 源码），
  * 也就是「降级成源码」而不是留空白。
  *
+ * 颜色与字号显式传入：调用方在铺 markdown 主题的 CompositionLocal 之前就要算这张表。
  * tex 表来自 [collectInlineTexes]，渲染侧 [mathAnnotator] 用同一个 `inlineTex()` 取 key，
  * 两条路径共用一套字符串规则。
  */
 @Composable
-internal expect fun mathInlineContents(texes: Set<String>): Map<String, InlineTextContent>
+internal expect fun mathInlineContents(
+    texes: Set<String>,
+    color: Color,
+    fontSize: TextUnit,
+): Map<String, InlineTextContent>
 
 /**
  * 在默认 annotator 上接管 `INLINE_MATH` 节点，把公式换成 inline content。

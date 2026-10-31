@@ -63,13 +63,6 @@ public fun MarkdownText(
     val components = remember { projectMarkdownComponents() }
     val referenceLinks = remember { ReferenceLinkHandlerImpl() }
 
-    // 行内公式：先从 AST 收集整篇出现过的 tex 建表，annotator 里按 key 命中同一条。
-    val source = document.blocks.firstOrNull()?.source ?: markdown
-    val inlineTexes = remember(document.blocks) { collectInlineTexes(document.blocks, source) }
-    val mathContents = mathInlineContents(inlineTexes)
-    val annotator = rememberMathAnnotator()
-    val inlineContent = markdownInlineContent(mathContents)
-
     // 主题可在运行时切换（明暗），所以逐个取 CompositionLocal 当前值，而不是写死默认。
     val theme = config.theme
     val colors = theme?.colors ?: markdownColor()
@@ -79,6 +72,14 @@ public fun MarkdownText(
     }
     val dimens = theme?.dimens ?: markdownDimens()
     val padding = theme?.padding ?: markdownPadding()
+
+    // 行内公式：先从 AST 收集整篇出现过的 tex 建表，annotator 里按 key 命中同一条。
+    // 颜色与字号显式传下去 —— 这时还不在 markdown 主题的 CompositionLocal 作用域里。
+    val source = document.blocks.firstOrNull()?.source ?: markdown
+    val inlineTexes = remember(document.blocks) { collectInlineTexes(document.blocks, source) }
+    val mathContents = mathInlineContents(inlineTexes, colors.text, typography.text.fontSize)
+    val annotator = rememberMathAnnotator()
+    val inlineContent = markdownInlineContent(mathContents)
 
     Box(modifier = if (theme?.background != Color.Unspecified && theme != null) {
         modifier.background(theme.background)

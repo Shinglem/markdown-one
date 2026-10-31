@@ -12,11 +12,18 @@
 - 行内公式的 annotator 不再在 `MarkdownTokenTypes.TEXT` 上兜底扫描 `$…$`：
   `CODE_SPAN` 的子节点同样是 `TEXT`，兜底会把行内代码里的 `$x$` 渲染成公式。
 
+### 变更
+
+- **公式引擎换成 `io.github.huarangmeng:latex-renderer:1.6.3`**（MIT，Compose 原生矢量绘制 +
+  KaTeX 字体），删除 JLaTeXMath 与自建的位图缓存（`MathImage` / `MathRenderCache`）。
+  行内与块级共用 `rememberLatexConfig`，字号取正文字号、颜色取正文色。
+  收益：高分屏清晰、`\Omega` 等大写希腊字母正常（JLaTeXMath 在 JDK 25+ 渲染空白，
+  见 opencollab/jlatexmath#111）、语法覆盖更全（`pmatrix` / `align` / `mhchem` 等）。
+
 ### 已知问题
 
-- JLaTeXMath 1.0.7 在 **JDK 25+** 上把 `\Omega` / `\varOmega` 渲染成空白（字形槽位 173
-  = U+00AD 被 JDK 当作隐形字符，见 [opencollab/jlatexmath#111](https://github.com/opencollab/jlatexmath/issues/111)，
-  未修复，1.0.8-SNAPSHOT 同样受影响）；其它大写希腊字母正常。
+- 块级公式由 `Latex()` 异步解析，首帧可能空白一两帧；行内公式是同步测量，不受影响。
+- 无法识别时由引擎自身把未知命令标红输出，`mathFallbackText` 只在测量失败（空输入等）时使用。
 
 ### 行为变更
 
