@@ -14,8 +14,8 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.hrm.latex.renderer.Latex
 import com.hrm.latex.renderer.measure.rememberLatexMeasurer
-import com.mikepenz.markdown.compose.LocalMarkdownColors
-import com.mikepenz.markdown.compose.LocalMarkdownTypography
+import io.github.shinglem.markdown.text.LocalMdColors
+import io.github.shinglem.markdown.text.LocalMdTypography
 import io.github.shinglem.markdown.MarkdownConfig
 import io.github.shinglem.markdown.adapter.AdapterKind
 import io.github.shinglem.markdown.adapter.BlockAdapter
@@ -52,8 +52,8 @@ internal class DesktopMathAdapter(private val config: MarkdownConfig) : BlockAda
     override fun Render(block: MdBlock, modifier: Modifier) {
         val math = block as MdBlock.Math
         val latexConfig = rememberLatexConfig(
-            color = LocalMarkdownColors.current.text,
-            fontSize = LocalMarkdownTypography.current.text.fontSize,
+            color = LocalMdColors.current.text,
+            fontSize = LocalMdTypography.current.text.fontSize,
         )
         val measurer = rememberLatexMeasurer(latexConfig)
         val dimensions = remember(measurer, math.tex, latexConfig) {

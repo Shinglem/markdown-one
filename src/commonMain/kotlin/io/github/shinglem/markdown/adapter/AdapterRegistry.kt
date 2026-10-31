@@ -63,7 +63,7 @@ public fun buildAdapterRegistry(config: MarkdownConfig): AdapterRegistry {
  * 内置适配器。集中在一处，便于测试与 demo 面板枚举能力。
  */
 public fun builtinAdapters(config: MarkdownConfig): List<BlockAdapter> = listOf(
-    io.github.shinglem.markdown.builtin.MarkdownBlockAdapter(config),
+    io.github.shinglem.markdown.builtin.TextBlockAdapter(config),
     io.github.shinglem.markdown.builtin.CodeHighlightAdapter(config),
     io.github.shinglem.markdown.builtin.MermaidAdapter(config),
     io.github.shinglem.markdown.builtin.DetailsAdapter(config),

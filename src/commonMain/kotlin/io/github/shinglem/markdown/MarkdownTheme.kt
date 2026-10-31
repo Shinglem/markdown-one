@@ -4,7 +4,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.TextStyle
@@ -13,26 +12,28 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.mikepenz.markdown.m3.markdownColor
-import com.mikepenz.markdown.m3.markdownTypography
-import com.mikepenz.markdown.model.MarkdownColors
-import com.mikepenz.markdown.model.MarkdownDimens
-import com.mikepenz.markdown.model.MarkdownPadding
-import com.mikepenz.markdown.model.MarkdownTypography
-import com.mikepenz.markdown.model.markdownDimens
-import com.mikepenz.markdown.model.markdownPadding
+import io.github.shinglem.markdown.text.MdColors
+import io.github.shinglem.markdown.text.MdDimens
+import io.github.shinglem.markdown.text.MdPadding
+import io.github.shinglem.markdown.text.MdTypography
+import io.github.shinglem.markdown.text.mdColors
+import io.github.shinglem.markdown.text.mdDimens
+import io.github.shinglem.markdown.text.mdPadding
+import io.github.shinglem.markdown.text.mdTypography
 
 /**
  * 一套完整的渲染外观：颜色、字体、尺寸、内边距与页面背景。
  *
  * 不传（`MarkdownConfig.theme == null`）时全部沿用 Material 3 默认值。
+ * 这些类型都是本库自己的（见 `io.github.shinglem.markdown.text`），渲染层不依赖任何
+ * 第三方 renderer 的模型 —— 换实现时宿主代码不用跟着改。
  */
 @Immutable
 public data class MarkdownTheme(
-    public val colors: MarkdownColors,
-    public val typography: MarkdownTypography,
-    public val dimens: MarkdownDimens,
-    public val padding: MarkdownPadding,
+    public val colors: MdColors,
+    public val typography: MdTypography,
+    public val dimens: MdDimens,
+    public val padding: MdPadding,
     /** 页面背景；`Color.Unspecified` 表示不画（透出父容器）。 */
     public val background: Color = Color.Unspecified,
 )
@@ -108,18 +109,17 @@ public fun outsidePaperTheme(dark: Boolean = false): MarkdownTheme {
 
     val body = style(15)
 
-    val colors = markdownColor(
+    val colors = mdColors(
         text = palette.text,
         codeBackground = palette.surface,
         inlineCodeBackground = palette.inlineCodeBackground,
         dividerColor = palette.divider.copy(alpha = 0.32f),
         tableBackground = palette.surface,
-        darkTheme = dark,
         highlightText = palette.accentSoft,
         highlightBackground = palette.inlineCodeBackground,
     )
 
-    val typography = markdownTypography(
+    val typography = mdTypography(
         h1 = style(24, FontWeight.Bold, palette.accent),
         h2 = style(20, FontWeight.SemiBold),
         h3 = style(17, FontWeight.SemiBold),
@@ -138,19 +138,18 @@ public fun outsidePaperTheme(dark: Boolean = false): MarkdownTheme {
         textLink = TextLinkStyles(
             style = SpanStyle(color = palette.accent, fontWeight = FontWeight.Medium),
         ),
-        alertTitle = body.copy(fontWeight = FontWeight.SemiBold),
     )
 
     return MarkdownTheme(
         colors = colors,
         typography = typography,
-        dimens = markdownDimens(
+        dimens = mdDimens(
             dividerThickness = 1.dp,
             codeBackgroundCornerSize = 8.dp,
             blockQuoteThickness = 3.dp,
             tableCornerSize = 6.dp,
         ),
-        padding = markdownPadding(),
+        padding = mdPadding(),
         background = palette.background,
     )
 }
@@ -182,18 +181,17 @@ public fun markdownMaterialTheme(): MarkdownTheme {
 
     val body = style(15)
 
-    val colors = markdownColor(
+    val colors = mdColors(
         text = scheme.onSurface,
         codeBackground = scheme.surfaceContainerHigh,
         inlineCodeBackground = scheme.secondaryContainer,
         dividerColor = scheme.outlineVariant,
         tableBackground = scheme.surfaceContainerLow,
-        darkTheme = scheme.background.luminance() < 0.5f,
         highlightText = scheme.onSecondaryContainer,
         highlightBackground = scheme.secondaryContainer,
     )
 
-    val typography = markdownTypography(
+    val typography = mdTypography(
         h1 = style(24, FontWeight.Bold, scheme.primary),
         h2 = style(20, FontWeight.SemiBold),
         h3 = style(17, FontWeight.SemiBold),
@@ -212,18 +210,17 @@ public fun markdownMaterialTheme(): MarkdownTheme {
         textLink = TextLinkStyles(
             style = SpanStyle(color = scheme.primary, fontWeight = FontWeight.Medium),
         ),
-        alertTitle = body.copy(fontWeight = FontWeight.SemiBold),
     )
 
     return MarkdownTheme(
         colors = colors,
         typography = typography,
-        dimens = markdownDimens(
+        dimens = mdDimens(
             dividerThickness = 1.dp,
             codeBackgroundCornerSize = 8.dp,
             blockQuoteThickness = 3.dp,
             tableCornerSize = 6.dp,
         ),
-        padding = markdownPadding(),
+        padding = mdPadding(),
     )
 }
