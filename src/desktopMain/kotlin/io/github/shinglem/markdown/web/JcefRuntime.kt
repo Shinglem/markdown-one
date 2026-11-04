@@ -7,9 +7,11 @@ package io.github.shinglem.markdown.web
  * 回落适配器自动不可用，链路退回源码显示。
  *
  * 可用前提（由使用方负责）：
- * 1. 运行时是 **JBR with JCEF**（或自备 CEF 运行时）；
- * 2. 启动参数带 `--add-modules jcef`，建议再加 `--enable-native-access=jcef`
- *    （JDK 24+ 调用 `System.loadLibrary` 会告警，未来版本会被拒绝）。
+ * 1. classpath 上有 `org.cef.*`（`me.friwi:jcefmaven` 会传递 `jcef-api`；JBR 则用
+ *    `--add-modules jcef`）；
+ * 2. 有一份 CEF 原生运行时（`jcef_helper.exe` / `libcef.dll` / `jcef.dll` / `resources.pak` /
+ *    `locales/`），位置由 `MarkdownConfig.cefNativeDir` 或 `-Dmarkdown.cef.dir` 指定，
+ *    也兼容摊在 `java.home/bin` 里的 JBR 布局（见 [CefNativeLocator]）。
  *
  * 探测只解析类与方法（不初始化、不加载 native），因此可以在任何线程安全调用；
  * 真正的 CEF 初始化（`startup` + `getInstance`）推迟到第一次渲染，见 [CefBootstrap]。
@@ -36,7 +38,7 @@ internal object JcefRuntime {
         if (isPresent) {
             ""
         } else {
-            "未找到 org.cef（需要 JBR with JCEF，且启动参数带 --add-modules jcef）"
+            "未找到 org.cef（需要 jcef-api 或 JBR with JCEF）"
         }
     }
 }

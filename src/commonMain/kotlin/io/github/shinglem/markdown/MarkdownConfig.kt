@@ -24,6 +24,17 @@ public data class MarkdownConfig(
     public val webFallback: WebFallback = WebFallback.Source,
     /** 回落渲染的高度（浏览器内容在内部滚动）。 */
     public val webFallbackHeight: Dp = 320.dp,
+    /**
+     * CEF 原生运行时目录：`jcef_helper.exe` / `libcef.dll` / `jcef.dll` / `resources.pak` / `locales/`
+     * 都在这个目录里平铺。
+     *
+     * null 时按「系统属性 `-Dmarkdown.cef.dir` → `java.home/bin`」探测。显式指定后 CEF 与 JVM
+     * 安装目录**完全无关** —— 可以把 bundle 放在应用自己的目录里（使用方负责解压分发），
+     * 不需要 JVM 目录可写，也不需要 `jcef.dll` 出现在 `java.library.path` 上。
+     *
+     * 只对 desktop 生效。CEF 是进程级单例：**首次初始化之后再改这个字段不会生效**。
+     */
+    public val cefNativeDir: String? = null,
     /** 为某个块生成交给浏览器渲染的 HTML 文档；返回 null 表示这个块不走回落渲染。
      *
      * 默认只处理「原始 HTML 块」（且需 [allowRawHtml]）。数学公式与图表需要 KaTeX / mermaid.js

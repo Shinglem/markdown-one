@@ -35,6 +35,32 @@ internal object CefRefs {
     /** `CefApp.startup(String[])`：**不调它 CEF 永远不会初始化**（详见 [CefBootstrap]）。 */
     val startup: Method by lazy { appClass.getMethod("startup", Array<String>::class.java) }
     val getInstance: Method by lazy { appClass.getMethod("getInstance", settingsClass) }
+
+    /**
+     * `getInstance(String[] args, CefSettings)`：args 是 CEF 的命令行（如 `--no-sandbox`）。
+     * JBR 打的补丁版可能没有这个重载，所以是可空的。
+     */
+    val getInstanceWithArgs: Method? by lazy {
+        runCatching { appClass.getMethod("getInstance", Array<String>::class.java, settingsClass) }.getOrNull()
+    }
+
+    /**
+     * `org.cef.SystemBootstrap`：CEF 自己加载 native 的入口。
+     * `setLoader` 让我们用**绝对路径**加载 `chrome_elf` / `libcef` / `jcef`，
+     * 从而不依赖 `java.library.path`，也不需要把这些文件塞进 `java.home/bin`。
+     */
+    val systemBootstrap: Class<*>? by lazy {
+        runCatching { Class.forName("org.cef.SystemBootstrap", false, loader) }.getOrNull()
+    }
+    val systemBootstrapLoader: Class<*>? by lazy {
+        runCatching { Class.forName("org.cef.SystemBootstrap\$Loader", false, loader) }.getOrNull()
+    }
+    val setLoader: Method? by lazy {
+        val bootstrap = systemBootstrap ?: return@lazy null
+        val loader = systemBootstrapLoader ?: return@lazy null
+        runCatching { bootstrap.getMethod("setLoader", loader) }.getOrNull()
+    }
+
     val getState: Method by lazy { appClass.getMethod("getState") }
     val createClient: Method by lazy { appClass.getMethod("createClient") }
     val getGlobalContext: Method by lazy { requestContextClass.getMethod("getGlobalContext") }

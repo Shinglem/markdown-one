@@ -27,11 +27,16 @@ canvas 盖住一切或者什么都不显示（实测两者都出现过）。OSR 
 
 | 要求 | 说明 |
 |---|---|
-| **JBR with JCEF** 或自备 CEF 运行时 | JetBrains Runtime 的 `jbrsdk_jcef-*` 版本；普通 JDK 没有 `jcef` 模块 |
-| `--add-modules jcef` | 加载 JCEF 模块 |
-| `--enable-native-access=jcef` | JDK 24+ 加载 native 的显式许可，将来会强制 |
+| `org.cef.*` | JBR with JCEF 自带；**普通 JDK** 用 `me.friwi:jcefmaven`（传递 `jcef-api`） |
+| CEF 原生运行时 | `jcef_helper.exe` / `libcef.dll` / `jcef.dll` / `resources.pak` / `locales/` 平铺在一个目录里 |
+| 目录怎么给 | `MarkdownConfig.cefNativeDir`、`-Dmarkdown.cef.dir` 或环境变量 `MARKDOWN_CEF_DIR`；都没有时回退 `java.home/bin`（JBR 布局） |
+| `--enable-native-access=ALL-UNNAMED` | JDK 24+ 加载 native 的显式许可，将来会强制（jcefmaven 不是命名模块，所以用 ALL-UNNAMED） |
 | `--add-opens java.desktop/sun.awt=ALL-UNNAMED` | JCEF 内部依赖 peer 实现 |
 | `--add-opens java.desktop/java.awt.peer=ALL-UNNAMED` | 同上 |
+
+**不需要 `-Djava.library.path`**：`CefBootstrap` 会把 CEF 自己的加载器换成按绝对路径加载
+（`SystemBootstrap.setLoader`），所以 CEF 目录放哪都行，也不要求 JVM 目录可写。
+`--add-modules jcef` 只有 JBR 的模块布局才需要。
 
 demo 里传 `-PjbrHome=<路径>` 会自动切换 JDK 并带上全部参数：
 
@@ -45,6 +50,7 @@ demo 里传 `-PjbrHome=<路径>` 会自动切换 JDK 并带上全部参数：
 MarkdownConfig(
     webFallback = WebFallback.Jcef,   // 启用回落（默认 Source：只显示源码）
     allowRawHtml = true,              // 允许渲染原始 HTML 块（默认关）
+    cefNativeDir = "/path/to/cef",    // CEF native 目录；null 时按系统属性/环境变量/java.home 探测
     webDocument = { block ->          // 自己决定哪些块进浏览器、生成什么 HTML
         if (block is MdBlock.Math) katexPage(block.tex) else null
     },
@@ -64,8 +70,10 @@ KaTeX / mermaid.js 这类脚本资源，库不打包脚本（保持零体积）�
 
 | 现象 | 原因 | 做法 |
 |---|---|---|
-| `CefApp.getState()` 永远停在 `NEW`，CEF 连 native 日志都不生成 | JBR 的 `getInstance()` 只是把初始化挂在一个内部 future 上，**只有 `startup()` 会完成它** | `CefApp.startup(new String[0])` **先于** `getInstance()` |
-| 子进程报 `Unrecognized option: --type=gpu-process` 后退出 | CEF 默认用 `java.exe` 当子进程，把 Chromium 的开关全传给了 JVM | `settings.browser_subprocess_path = <java.home>/bin/jcef_helper.exe` |
+| `CefApp.getState()` 永远停在 `NEW` | **`getInstance()` 不触发初始化**：它只建对象并把状态置 `NEW`（JBR 的补丁版靠 `startup()` 才推进） | 先 `startup(...)`，`getInstance(...)` 之后若仍是 `NEW` 就调一次 `createClient()` |
+| `UnsatisfiedLinkError: no chrome_elf in java.library.path` | `SystemBootstrap.loadLibrary` 走 `ClassLoader.loadLibrary`，先在 `java.library.path` 里**按名字找文件**，找不到直接抛 —— 之前的 `System.load(绝对路径)` 不算数 | `SystemBootstrap.setLoader(...)` 换成按绝对路径加载（`CefBootstrap` 已内置） |
+| `Can't find dependent libraries`（不说缺谁） | `libcef.dll` 静态导入 `chrome_elf.dll`、`jcef.dll` 静态导入 `jawt.dll` | 兜底路径按 `jawt → chrome_elf → libcef → jcef` 预加载 |
+| 子进程报 `Unrecognized option: --type=gpu-process` 后退出 | CEF 默认用 `java.exe` 当子进程，把 Chromium 的开关全传给了 JVM | `settings.browser_subprocess_path = <cef 目录>/jcef_helper.exe` |
 | 第二个进程卡在 `NEW`，日志出现 `Opening in existing browser session.` | 多个进程共用默认 user data 目录，后启动的连到已有实例 | `settings.cache_path` 按 PID 隔离 |
 | 浏览器占着位置但一帧都不来 | OSR 浏览器是惰性创建的，不调用就没有渲染进程 | `browser.createImmediately()` |
 | 同上，且以上都做了 | `CefRenderHandler.getScreenInfo` 返回 false 或没填字段，CEF 认为没有可用屏幕 | **填充 `CefScreenInfo` 全部字段并返回 true** |

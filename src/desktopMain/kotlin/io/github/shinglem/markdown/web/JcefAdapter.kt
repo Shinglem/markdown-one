@@ -43,6 +43,11 @@ import io.github.shinglem.markdown.rootSize
  */
 internal class JcefAdapter(private val config: MarkdownConfig) : BlockAdapter {
 
+    init {
+        // 目录必须在 CEF 首次初始化之前登记（初始化后是进程级不可变的）。
+        config.cefNativeDir?.takeIf { it.isNotBlank() }?.let { CefNativeLocator.explicitDir = java.io.File(it) }
+    }
+
     override val id: String = "builtin.jcef"
     override val kind: AdapterKind = AdapterKind.Jcef
     override val priority: Int = 50
