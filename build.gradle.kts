@@ -45,8 +45,14 @@ val vDiagram = "1.0.6"
  * 但**不绑定 JVM**。不用 jsoup 是为了避免将来多端化时再换库 / 分叉 expect/actual。
  */
 val vKsoup = "0.2.6"
-/** 公式排版引擎（io.github.huarangmeng，MIT）：Compose 原生矢量绘制 + KaTeX 字体。 */
-val vLatex = "1.6.3"
+/**
+ * 公式排版引擎（io.github.darriousliu，MIT）：RaTeX（Rust 核心）的 Compose 封装。
+ *
+ * 取代了 `io.github.huarangmeng:latex-renderer`：14 个高级用例实测后者在
+ * `\mathbb` / `\mathcal`、`\left\{`、`\operatorname` 正体、`\xrightarrow` 长度、
+ * align 逐行编号上明显更弱。代价是要随包带一份 native dll（1.1 MB）。
+ */
+val vRatex = "0.1.15"
 /** 与 `gradle/libs.versions.toml` 的 `compose` 版本保持一致（仅用于 ui-test 坐标，宿主升级时同步）。 */
 val vCompose = "1.12.2"
 
@@ -85,11 +91,12 @@ kotlin {
             implementation("com.fleeksoft.ksoup:ksoup:$vKsoup")
         }
 
-        // 公式排版：latex-renderer 是纯 Compose 的 LaTeX 引擎（矢量绘制 + KaTeX 字体），
-        // 无需 AWT / WebView；行内与块级共用同一套测量与主题。
+        // 公式排版：RaTeX（Rust 核心 + Compose 绘制），比原 latex-renderer 支持面更广
+        // （\mathbb/\mathcal、\left\{、\operatorname 正体、\xrightarrow、align 逐行编号）。
+        // native 部分必须随包分发：dll 打在 ratex-native jar 里，由库自己解压加载。
         desktopMain.dependencies {
-            implementation("io.github.huarangmeng:latex-renderer:$vLatex")
-            implementation("io.github.huarangmeng:latex-fonts-katex:$vLatex")
+            implementation("io.github.darriousliu:ratex:$vRatex")
+            runtimeOnly("io.github.darriousliu:ratex-native-windows-x86-64:$vRatex")
         }
 
         commonTest.dependencies {

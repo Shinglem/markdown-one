@@ -43,7 +43,7 @@ internal fun inlineTex(source: String, node: ASTNode): String =
 /**
  * 行内公式的 [InlineTextContent]：按 tex 建表，渲染器由平台提供。
  *
- * desktop 用 `latex-renderer` 直接产出 inline content；其它端返回空表 —— 那时
+ * desktop 用 `ratex` 直接产出 inline content；其它端返回空表 —— 那时
  * 文本里的 `appendInlineContent` 找不到 key，Compose 会退回 `alternateText`（即 TeX 源码），
  * 也就是「降级成源码」而不是留空白。
  *

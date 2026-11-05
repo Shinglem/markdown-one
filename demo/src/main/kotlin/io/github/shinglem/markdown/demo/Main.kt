@@ -177,7 +177,7 @@ private val FIXTURES = listOf(
     ),
     // 公式 fixture 用 `§` 代替 `$`，避免 Kotlin raw string 里的模板插值（替换在 trimIndent 之后做）。
     //
-    // 公式由 `io.github.huarangmeng:latex-renderer` 排版（Compose 矢量绘制 + KaTeX 字体），
+    // 公式由 `io.github.darriousliu:ratex` 排版（Rust 核心 + Compose 矢量绘制），
     // 大写希腊字母（含 `\Omega`）与 `\begin{pmatrix}` 都正常。
     Fixture(
         "公式",
