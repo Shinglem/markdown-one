@@ -1,6 +1,7 @@
 package io.github.shinglem.markdown.text
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.InlineTextContent
@@ -46,6 +47,14 @@ internal val LocalMdReferences = staticCompositionLocalOf<Map<String, String>> {
 
 /** 链接点击：库自身**不打开任何东西**，只把地址交给宿主（见 SECURITY.md）。 */
 internal val LocalMdOnLinkClick = staticCompositionLocalOf<(String) -> Unit> { {} }
+
+/**
+ * 图片点击：`(url, alt)`。
+ *
+ * 由 `MarkdownText` 自己接管并弹出全屏预览（见 `ImagePreview.kt`）；宿主不需要实现。
+ * 行内图片与块级图片走同一个入口。
+ */
+internal val LocalMdOnImageClick = staticCompositionLocalOf<(String, String) -> Unit> { { _, _ -> } }
 
 /** 代码块超过这个长度就跳过同步着色。 */
 internal val LocalMdMaxSyncHighlightLength = staticCompositionLocalOf { 8_000 }
@@ -232,11 +241,12 @@ private fun MdInlineImage(image: MdImageRef, sizes: MutableMap<String, IntSize>,
             sizes[image.url] = detected
         }
     }
+    val onImageClick = LocalMdOnImageClick.current
     Image(
         painter = painter,
         contentDescription = image.alt ?: alternateText,
         contentScale = ContentScale.Fit,
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize().clickable { onImageClick(image.url, image.alt.orEmpty()) },
     )
 }
 

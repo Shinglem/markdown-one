@@ -9,7 +9,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.key
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
@@ -21,6 +24,7 @@ import io.github.shinglem.markdown.text.LocalMdColors
 import io.github.shinglem.markdown.text.LocalMdDimens
 import io.github.shinglem.markdown.text.LocalMdMathContent
 import io.github.shinglem.markdown.text.LocalMdMaxSyncHighlightLength
+import io.github.shinglem.markdown.text.LocalMdOnImageClick
 import io.github.shinglem.markdown.text.LocalMdOnLinkClick
 import io.github.shinglem.markdown.text.LocalMdPadding
 import io.github.shinglem.markdown.text.LocalMdReferences
@@ -30,6 +34,7 @@ import io.github.shinglem.markdown.text.mdColors
 import io.github.shinglem.markdown.text.mdDimens
 import io.github.shinglem.markdown.text.mdPadding
 import io.github.shinglem.markdown.text.mdTypography
+import io.github.shinglem.markdown.text.MdImagePreview
 import io.github.shinglem.markdown.text.withTextAlign
 
 /**
@@ -79,6 +84,10 @@ public fun MarkdownText(
         collectLinkDefinitions(source, document.blocks.map { it.node })
     }
 
+    // 图片全屏预览：库自己接管，宿主不必实现（行内与块级图片共用一个入口）。
+    var preview by remember(markdown) { mutableStateOf<Pair<String, String>?>(null) }
+    val onImageClick: (String, String) -> Unit = { url, alt -> preview = url to alt }
+
     Box(
         modifier = if (theme != null && theme.background != Color.Unspecified) {
             modifier.background(theme.background)
@@ -96,6 +105,7 @@ public fun MarkdownText(
             LocalMdReferences provides references,
             LocalMdAdapterRegistry provides registry,
             LocalMdOnLinkClick provides config.onLinkClick,
+            LocalMdOnImageClick provides onImageClick,
             LocalMdMaxSyncHighlightLength provides config.maxSyncHighlightLength,
         ) {
             // 选择框只包一次：每块一个 SelectionContainer 会让跨块选区断成若干段。
@@ -126,5 +136,9 @@ public fun MarkdownText(
             }
             if (selectable) SelectionContainer(content = content) else content()
         }
+    }
+
+    preview?.let { (url, alt) ->
+        MdImagePreview(url = url, alt = alt, onDismiss = { preview = null })
     }
 }

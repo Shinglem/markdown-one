@@ -45,7 +45,9 @@ internal object MdBlockFactory {
             MarkdownElementTypes.HTML_BLOCK -> MdBlock.Html(key, source, rawText, node)
 
             MarkdownElementTypes.PARAGRAPH ->
-                mathBlock(key, source, rawText, node) ?: MdBlock.Paragraph(key, source, rawText, node)
+                imageBlock(key, source, rawText, node)
+                    ?: mathBlock(key, source, rawText, node)
+                    ?: MdBlock.Paragraph(key, source, rawText, node)
 
             // GFM 0.7.17 原生识别 `$$…$$`，比在段落层做文本判定可靠
             GFMElementTypes.BLOCK_MATH -> MdBlock.Math(
@@ -62,6 +64,40 @@ internal object MdBlockFactory {
 
             else -> MdBlock.Paragraph(key, source, rawText, node)
         }
+    }
+
+    /**
+     * 独占一行的图片 `![](url)` → [MdBlock.Image]。
+     *
+     * GFM 把独占一行的图片解析成 `PARAGRAPH`（内含 `IMAGE`），所以以前这类图片走行内渲染：
+     * 既拿不到 `BlockViewport` 的限高缩放，也没法挂「点击放大」。这里在段落层识别出
+     * 「只有一个图片、没有其它文本」的情况，升级成块级。
+     *
+     * 与文字混排的图片（`文字 ![alt](url) 文字`）仍走段落 → 行内，行为不变。
+     */
+    private fun imageBlock(key: String, source: String, rawText: String, node: ASTNode): MdBlock.Image? {
+        val meaningful = node.children.filterNot {
+            it.type == MarkdownTokenTypes.EOL || it.type == MarkdownTokenTypes.WHITE_SPACE
+        }
+        val image = meaningful.singleOrNull()?.takeIf { it.type == MarkdownElementTypes.IMAGE } ?: return null
+        // url 取 LINK_DESTINATION 原文（`<...>` 包裹形式要剥掉）；取不到就不是有效的图片块
+        val url = image.childOfType(MarkdownElementTypes.LINK_DESTINATION)
+            ?.let { source.substring(it.startOffset, it.endOffset).trim().removeSurrounding("<", ">") }
+            ?.takeIf { it.isNotBlank() }
+            ?: return null
+        val alt = image.childOfType(MarkdownElementTypes.LINK_TEXT)
+            ?.let { source.substring(it.startOffset, it.endOffset).trim().removeSurrounding("[", "]") }
+            ?.takeIf { it.isNotBlank() }
+            .orEmpty()
+        return MdBlock.Image(key, source, rawText, node, url, alt)
+    }
+
+    private fun ASTNode.childOfType(type: org.intellij.markdown.IElementType): ASTNode? {
+        children.forEach { child ->
+            if (child.type == type) return child
+            child.childOfType(type)?.let { return it }
+        }
+        return null
     }
 
     /**

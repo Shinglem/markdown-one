@@ -23,6 +23,8 @@ public data class MarkdownConfig(
     public val mermaidFallbackText: String = "图表语法暂不支持，已显示源码",
     /** 公式排版失败时的提示文案（desktop 用 ratex 原生排版，其它端或测量失败时回落源码）。 */
     public val mathFallbackText: String = "公式排版不可用，已显示源码",
+    /** 图片加载失败时的提示文案（随后会给出地址，便于判断是网络还是链接问题）。 */
+    public val imageFallbackText: String = "图片加载失败",
     /** 超过这个长度的代码块跳过同步着色（大块同步着色会卡 UI）。 */
     public val maxSyncHighlightLength: Int = 8_000,
     /** 链接点击回调。 */
