@@ -1,5 +1,6 @@
 package io.github.shinglem.markdown.parse
 
+import io.github.shinglem.markdown.code.parseCodeFence
 import io.github.shinglem.markdown.model.AlertKind
 import io.github.shinglem.markdown.model.MdBlock
 import org.intellij.markdown.MarkdownElementTypes
@@ -123,12 +124,23 @@ internal object MdBlockFactory {
         node: ASTNode,
         fenced: Boolean,
     ): MdBlock.CodeBlock {
-        val language = node.children
+        val label = node.children
             .firstOrNull { it.type == MarkdownTokenTypes.FENCE_LANG }
             ?.let { source.substring(it.startOffset, it.endOffset).trim() }
             ?.takeIf { it.isNotEmpty() }
+        // 标签可能是 `kotlin {1,3-5}`：语言用于着色，花括号部分是行高亮范围
+        val info = parseCodeFence(label)
         val code = if (fenced) stripFences(rawText) else rawText.trimEnd('\n')
-        return MdBlock.CodeBlock(key, source, rawText, node, code = code, language = language, fenced = fenced)
+        return MdBlock.CodeBlock(
+            key = key,
+            source = source,
+            raw = rawText,
+            node = node,
+            code = code,
+            language = info.language,
+            fenced = fenced,
+            highlightLines = info.highlightLines,
+        )
     }
 
     /** 去掉首行 ```lang 与末行 ```。 */

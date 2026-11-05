@@ -357,6 +357,53 @@ private val FIXTURES = listOf(
         """.trimIndent(),
     ),
     Fixture(
+        "代码块行号与行高亮",
+        """
+        # 代码块行号与行高亮
+
+        多行代码左侧出现行号列；```` ```kotlin {2,5-6} ```` 这种写法会把指定行整行高亮
+        （含行号区），左侧还有一条强调条。
+
+        ```kotlin {2,5-6}
+        class Repo(private val client: HttpClient) {
+            suspend fun load(id: String): Message {
+                val response = client.get("${'$'}base/messages/${'$'}id")
+                return response.body()
+            }
+
+            fun close() {
+                client.close()
+            }
+        }
+        ```
+
+        较长的行号（三位数）也应对齐：
+
+        ```text {1,10,100}
+        01
+        02
+        03
+        04
+        05
+        06
+        07
+        08
+        09
+        10
+        11
+        12
+        13
+        14
+        15
+        16
+        17
+        18
+        19
+        20
+        ```
+        """.trimIndent(),
+    ),
+    Fixture(
         "Alerts 与脚注",
         """
         # Alerts 与脚注

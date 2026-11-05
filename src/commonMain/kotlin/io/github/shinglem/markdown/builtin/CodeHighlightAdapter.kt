@@ -36,6 +36,8 @@ internal class CodeHighlightAdapter(private val config: MarkdownConfig) : BlockA
             language = codeBlock.language,
             modifier = modifier,
             maxSyncHighlightLength = config.maxSyncHighlightLength,
+            highlightLines = codeBlock.highlightLines,
+            showLineNumbers = config.codeLineNumbers,
         )
     }
 }

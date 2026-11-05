@@ -55,6 +55,8 @@ public sealed interface MdBlock {
         public val code: String,
         public val language: String?,
         public val fenced: Boolean,
+        /** ```` ```kotlin {1,3-5} ```` 里要高亮的行号（1 基）。 */
+        public val highlightLines: Set<Int> = emptySet(),
     ) : MdBlock {
         override val formats: Set<FormatId>
             get() = buildSet {

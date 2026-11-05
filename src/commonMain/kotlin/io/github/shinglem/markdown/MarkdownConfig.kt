@@ -25,6 +25,12 @@ public data class MarkdownConfig(
     public val mathFallbackText: String = "公式排版不可用，已显示源码",
     /** 图片加载失败时的提示文案（随后会给出地址，便于判断是网络还是链接问题）。 */
     public val imageFallbackText: String = "图片加载失败",
+    /**
+     * 代码块是否显示行号。
+     *
+     * 关掉只是不画行号列；```` ```kotlin {1,3-5} ```` 的行高亮仍然生效（高亮不依赖行号）。
+     */
+    public val codeLineNumbers: Boolean = true,
     /** 超过这个长度的代码块跳过同步着色（大块同步着色会卡 UI）。 */
     public val maxSyncHighlightLength: Int = 8_000,
     /** 链接点击回调。 */

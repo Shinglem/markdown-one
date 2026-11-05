@@ -3,12 +3,14 @@ package io.github.shinglem.markdown.text
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
@@ -23,10 +25,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.isSpecified
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.shinglem.markdown.code.highlightCode
@@ -47,6 +54,10 @@ internal fun MdCodeBlock(
     language: String?,
     modifier: Modifier = Modifier,
     maxSyncHighlightLength: Int = LocalMdMaxSyncHighlightLength.current,
+    /** ```` ```kotlin {1,3-5} ```` 里要高亮的行号（1 基）。 */
+    highlightLines: Set<Int> = emptySet(),
+    /** 是否有行号：只有多行代码才值得占一列。 */
+    showLineNumbers: Boolean = true,
 ) {
     val colors = LocalMdColors.current
     val dimens = LocalMdDimens.current
@@ -59,6 +70,15 @@ internal fun MdCodeBlock(
         } else {
             AnnotatedString(code)
         }
+    }
+    val lines = remember(code) { code.lines() }
+    val gutter = showLineNumbers && lines.size > 1
+    // 行高必须固定成同一个值：行号列与代码列各画各的，靠它对齐。
+    val lineHeight = typography.code.lineHeight
+    val lineHeightDp = if (lineHeight.isSpecified) {
+        with(LocalDensity.current) { lineHeight.toDp() }
+    } else {
+        with(LocalDensity.current) { typography.code.fontSize.toDp() * 1.6f }
     }
 
     Column(
@@ -85,13 +105,99 @@ internal fun MdCodeBlock(
         }
         // 顶栏与代码之间的分隔线：0.5dp 在 2x 屏上才不会被压成 0 像素
         Spacer(Modifier.fillMaxWidth().height(0.5.dp).background(colors.dividerColor.copy(alpha = 0.3f)))
-        BasicText(
-            text = highlighted,
-            style = typography.code,
-            modifier = Modifier
-                .horizontalScroll(rememberScrollState())
-                .padding(padding.codeBlock),
-        )
+        Row(
+            Modifier
+                .fillMaxWidth()
+                // 整行高亮画在**这一层**：它横跨行号列与代码列，且不随代码的横向滚动移动
+                .drawBehind {
+                    if (highlightLines.isEmpty()) return@drawBehind
+                    val rowHeight = lineHeightDp.toPx()
+                    val top = padding.codeBlock.calculateTopPadding().toPx()
+                    highlightLines.forEach { line ->
+                        val index = line - 1
+                        if (index < 0 || index >= lines.size) return@forEach
+                        drawRect(
+                            color = colors.highlightBackground,
+                            topLeft = Offset(0f, top + index * rowHeight),
+                            size = Size(size.width, rowHeight),
+                        )
+                    }
+                    // 高亮行左侧的强调条（与 GitHub 的观感一致）
+                    highlightLines.forEach { line ->
+                        val index = line - 1
+                        if (index < 0 || index >= lines.size) return@forEach
+                        drawRect(
+                            color = colors.highlightText.copy(alpha = 0.55f),
+                            topLeft = Offset(0f, top + index * rowHeight),
+                            size = Size(3.dp.toPx(), rowHeight),
+                        )
+                    }
+                },
+        ) {
+            if (gutter) {
+                LineNumberGutter(
+                    count = lines.size,
+                    lineHeight = lineHeightDp,
+                    topPadding = padding.codeBlock.calculateTopPadding(),
+                    bottomPadding = padding.codeBlock.calculateBottomPadding(),
+                    highlightLines = highlightLines,
+                )
+            }
+            BasicText(
+                text = highlighted,
+                style = typography.code,
+                modifier = Modifier
+                    .weight(1f)
+                    .horizontalScroll(rememberScrollState())
+                    .padding(padding.codeBlock),
+            )
+        }
+    }
+}
+
+/**
+ * 行号列。
+ *
+ * 宽度按最大行号的位数算，避免四位数行号把代码挤走；每行高度显式指定为 [lineHeight]，
+ * 与代码列用同一个 `lineHeight` 才可能对齐（代码块不软换行，所以一个逻辑行 = 一个物理行）。
+ */
+@Composable
+private fun LineNumberGutter(
+    count: Int,
+    lineHeight: androidx.compose.ui.unit.Dp,
+    topPadding: androidx.compose.ui.unit.Dp,
+    bottomPadding: androidx.compose.ui.unit.Dp,
+    highlightLines: Set<Int>,
+) {
+    val typography = LocalMdTypography.current
+    val colors = LocalMdColors.current
+    val density = LocalDensity.current
+    val digits = count.toString().length
+    val width = with(density) { typography.code.fontSize.toDp() * (digits * 0.75f + 1.2f) }
+    Column(
+        Modifier
+            .padding(start = 8.dp, top = topPadding, bottom = bottomPadding)
+            .width(width),
+    ) {
+        repeat(count) { index ->
+            val lineNumber = index + 1
+            Box(
+                Modifier.fillMaxWidth().height(lineHeight),
+                contentAlignment = Alignment.CenterEnd,
+            ) {
+                Text(
+                    text = lineNumber.toString(),
+                    style = typography.code,
+                    color = if (lineNumber in highlightLines) {
+                        colors.text.copy(alpha = 0.95f)
+                    } else {
+                        colors.text.copy(alpha = 0.38f)
+                    },
+                    maxLines = 1,
+                )
+            }
+        }
+        if (bottomPadding > 0.dp) Spacer(Modifier.height(0.dp))
     }
 }
 
