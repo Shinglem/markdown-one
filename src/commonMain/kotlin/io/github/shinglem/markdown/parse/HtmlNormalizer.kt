@@ -132,7 +132,15 @@ private fun rewriteTags(text: String): String {
     result = IMAGE.replace(result) { match ->
         val attrs = match.groupValues[1]
         val src = attr(attrs, "src")
-        if (src.isBlank()) match.value else "![${attr(attrs, "alt")}]($src)"
+        if (src.isBlank()) {
+            match.value
+        } else {
+            val alt = attr(attrs, "alt")
+            // 尺寸塞进 Markdown 图片的 title（`![alt](src "size=120x40")`）：
+            // 标准语法、解析器原生支持，行内构建器再把它读成占位尺寸约束。
+            val size = imageSize(attrs)
+            if (size == null) "![$alt]($src)" else "![$alt]($src \"size=$size\")"
+        }
     }
     result = LINK.replace(result) { match ->
         val href = attr(match.groupValues[1], "href")
@@ -148,6 +156,22 @@ private fun rewriteTags(text: String): String {
 private fun attr(attrs: String, name: String): String =
     Regex("""\b$name\s*=\s*["']([^"']*)["']""", RegexOption.IGNORE_CASE)
         .find(attrs)?.groupValues?.get(1)?.trim().orEmpty()
+
+/**
+ * `<img>` 的 `width` / `height` → `120x40` / `120x` / `x40`。
+ *
+ * 只接受纯像素数（`120`、`120px`）；百分比或 `auto` 一律丢弃 —— 没有布局引擎，
+ * 猜一个尺寸比按原图尺寸渲染更容易出错。
+ */
+private fun imageSize(attrs: String): String? {
+    val width = pixelValue(attr(attrs, "width"))
+    val height = pixelValue(attr(attrs, "height"))
+    if (width == null && height == null) return null
+    return (width?.toString().orEmpty()) + "x" + (height?.toString().orEmpty())
+}
+
+private fun pixelValue(value: String): Int? =
+    value.trim().removeSuffix("px").trim().toIntOrNull()?.takeIf { it > 0 }
 
 private val BREAK = Regex("""<br\s*/?\s*>""", RegexOption.IGNORE_CASE)
 private val IMAGE = Regex("""<img\b([^>]*)>""", RegexOption.IGNORE_CASE)

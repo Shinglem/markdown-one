@@ -341,6 +341,8 @@ private fun isBlockNode(type: IElementType): Boolean = headingLevelOf(type) != n
     MarkdownTokenTypes.HORIZONTAL_RULE,
     GFMElementTypes.TABLE,
     GFMElementTypes.BLOCK_MATH,
+    // Alerts 也可能嵌在引用/列表项里（`- 项\n\n  > [!WARNING]`），同样要按块渲染
+    GFMElementTypes.ALERT,
     -> true
 
     else -> false

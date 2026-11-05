@@ -9,6 +9,9 @@ package io.github.shinglem.markdown.adapter
  * - `mermaid`       mermaid 图表（`code:mermaid` 的块同时声明它）
  * - `math`          数学公式
  * - `html`          原始 HTML 块
+ * - `alert`         GitHub Alerts（`> [!NOTE]`，同时声明 `markdown`）
+ * - `footnotes`     脚注定义区（文库末，同时声明 `markdown`）
+ * - `heading` / `paragraph` / `quote` / `list` / `rule` / `details`  具体块类型
  * - `image.generic` 图片
  * - `*`             通配（仅兜底适配器使用）
  */
@@ -26,6 +29,8 @@ public object Formats {
     public val Mermaid: FormatId = FormatId("mermaid")
     public val Math: FormatId = FormatId("math")
     public val Html: FormatId = FormatId("html")
+    public val Alert: FormatId = FormatId("alert")
+    public val Footnotes: FormatId = FormatId("footnotes")
     public val Table: FormatId = FormatId("table")
     public val Image: FormatId = FormatId("image.generic")
     public val Any: FormatId = FormatId("*")

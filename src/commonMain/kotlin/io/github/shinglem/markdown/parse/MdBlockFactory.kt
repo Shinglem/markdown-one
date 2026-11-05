@@ -1,10 +1,12 @@
 package io.github.shinglem.markdown.parse
 
+import io.github.shinglem.markdown.model.AlertKind
 import io.github.shinglem.markdown.model.MdBlock
 import org.intellij.markdown.MarkdownElementTypes
 import org.intellij.markdown.MarkdownTokenTypes
 import org.intellij.markdown.ast.ASTNode
 import org.intellij.markdown.flavours.gfm.GFMElementTypes
+import org.intellij.markdown.flavours.gfm.GFMTokenTypes
 
 /**
  * 单个 AST 节点 → [MdBlock] 的映射。
@@ -33,6 +35,9 @@ internal object MdBlockFactory {
             MarkdownElementTypes.CODE_BLOCK -> codeBlock(key, source, rawText, node, fenced = false)
 
             MarkdownElementTypes.BLOCK_QUOTE -> MdBlock.Quote(key, source, rawText, node)
+            // GFM 原生识别 `> [!NOTE]`；不认识的标记按普通引用渲染（与 GitHub 一致）
+            GFMElementTypes.ALERT -> alert(key, source, rawText, node)
+                ?: MdBlock.Quote(key, source, rawText, node)
             MarkdownElementTypes.UNORDERED_LIST -> MdBlock.ListBlock(key, source, rawText, node, ordered = false)
             MarkdownElementTypes.ORDERED_LIST -> MdBlock.ListBlock(key, source, rawText, node, ordered = true)
             GFMElementTypes.TABLE -> MdBlock.Table(key, source, rawText, node)
@@ -57,6 +62,22 @@ internal object MdBlockFactory {
 
             else -> MdBlock.Paragraph(key, source, rawText, node)
         }
+    }
+
+    /**
+     * `ALERT` 节点 → [MdBlock.Alert]。
+     *
+     * 标题是 `ALERT_TITLE` token（文本形如 `[!NOTE]`）；标记不认识时返回 null，
+     * 由调用方按普通引用处理。
+     */
+    private fun alert(key: String, source: String, rawText: String, node: ASTNode): MdBlock.Alert? {
+        val title = node.children
+            .firstOrNull { it.type == GFMTokenTypes.ALERT_TITLE }
+            ?.let { source.substring(it.startOffset, it.endOffset) }
+            ?.trim()
+            ?: return null
+        val kind = AlertKind.fromMarker(title.removePrefix("[!").removeSuffix("]")) ?: return null
+        return MdBlock.Alert(key, source, rawText, node, kind)
     }
 
     private fun codeBlock(

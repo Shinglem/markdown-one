@@ -30,6 +30,7 @@ class MdInlineTest {
         link = TextLinkStyles(SpanStyle(color = Color.Blue)),
         code = SpanStyle(fontFamily = FontFamily.Monospace),
         highlight = SpanStyle(background = Color.Yellow),
+        footnote = SpanStyle(baselineShift = androidx.compose.ui.text.style.BaselineShift.Superscript),
         references = mapOf("ref" to "https://example.com/ref"),
         linkListener = null,
     )

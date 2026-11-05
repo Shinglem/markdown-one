@@ -34,6 +34,7 @@ internal data class MdInlineStyles(
     val link: TextLinkStyles,
     val code: SpanStyle,
     val highlight: SpanStyle,
+    val footnote: SpanStyle,
     val references: Map<String, String>,
     val linkListener: LinkInteractionListener?,
 )
@@ -43,7 +44,31 @@ internal class MdImageRef(
     val key: String,
     val url: String,
     val alt: String?,
+    /** `<img width>` 透传过来的像素宽（null 表示未指定）。 */
+    val widthPx: Int? = null,
+    /** `<img height>` 透传过来的像素高（null 表示未指定）。 */
+    val heightPx: Int? = null,
 )
+
+/** 图片的显式尺寸（来自 `<img width/height>`，经 `HtmlNormalizer` 塞进 Markdown 图片 title）。 */
+internal data class ImageSize(val width: Int?, val height: Int?)
+
+/**
+ * 从 Markdown 图片的 title 里读出尺寸：`size=120x40` / `size=120x` / `size=x40`。
+ *
+ * 沿用 HTML 的 `width` / `height` 语义（CSS 像素），只做占位尺寸约束，
+ * 不改变图片本身的宽高比 —— 单边指定时另一边按加载后的真实比例推。
+ */
+internal fun parseImageSize(title: String?): ImageSize? {
+    val text = title?.trim()?.removeSurrounding("\"")?.removeSurrounding("'")?.trim() ?: return null
+    val match = IMAGE_SIZE.find(text) ?: return null
+    val width = match.groupValues[1].takeIf { it.isNotEmpty() }?.toIntOrNull()?.takeIf { it > 0 }
+    val height = match.groupValues[2].takeIf { it.isNotEmpty() }?.toIntOrNull()?.takeIf { it > 0 }
+    if (width == null && height == null) return null
+    return ImageSize(width, height)
+}
+
+private val IMAGE_SIZE = Regex("""^size=(\d*)x(\d*)$""")
 
 /** 行内构建结果：文本 + 需要配套 inline content 的图片。 */
 internal class MdInline(
@@ -220,6 +245,13 @@ private class InlineWalker(
             appendChildren(inner)
             return
         }
+        if (isFootnoteRef(destination)) {
+            // 脚注引用：`FootnoteNormalizer` 把 `[^id]` 改写成了 `[n](#fn-id)`，这里画成上标。
+            builder.pushStyle(styles.footnote)
+            withLink(destination) { appendChildren(inner) }
+            builder.pop()
+            return
+        }
         withLink(destination) { appendChildren(inner) }
     }
 
@@ -260,7 +292,12 @@ private class InlineWalker(
         val alt = node.findChildRecursive(MarkdownElementTypes.LINK_TEXT)
             ?.let { unescape(source, it).trim().removeSurrounding("[", "]").trim() }
             ?.takeIf { it.isNotEmpty() }
-        val ref = MdImageRef(IMAGE_KEY_PREFIX + url, url, alt)
+        // title 原文里带引号，且 `unescape` 会把 `"` 转成 `&quot;`：尺寸直接从源码片段读
+        val size = parseImageSize(
+            node.findChildRecursive(MarkdownElementTypes.LINK_TITLE)
+                ?.let { source.substring(it.startOffset, it.endOffset) },
+        )
+        val ref = MdImageRef(IMAGE_KEY_PREFIX + url, url, alt, size?.width, size?.height)
         images += ref
         builder.appendInlineContent(ref.key, alt ?: url)
     }
@@ -296,6 +333,11 @@ private class InlineWalker(
 
 private fun IElementType.isBracket(): Boolean =
     this == MarkdownTokenTypes.LBRACKET || this == MarkdownTokenTypes.RBRACKET
+
+/** 脚注引用的地址前缀（由 `FootnoteNormalizer` 生成：`[1](#fn-id)`）。 */
+internal const val FOOTNOTE_LINK_PREFIX = "#fn-"
+
+internal fun isFootnoteRef(destination: String): Boolean = destination.startsWith(FOOTNOTE_LINK_PREFIX)
 
 /** 链接文字：反转义 `\*` 之类的转义序列，保留实体原样。 */
 private fun unescape(source: String, node: ASTNode): String =

@@ -1,5 +1,6 @@
 package io.github.shinglem.markdown.parse
 
+import io.github.shinglem.markdown.model.FootnoteItem
 import io.github.shinglem.markdown.model.MdBlock
 import io.github.shinglem.markdown.model.MdDocument
 import org.intellij.markdown.flavours.gfm.GFMFlavourDescriptor
@@ -20,8 +21,10 @@ public class GfmMarkdownParser : MarkdownParser {
 
     override fun parse(source: String, streaming: Boolean): MdDocument {
         val balanced = if (streaming) balanceCodeFences(source) else source
+        // 脚注定义与正文引用：必须在解析前抽出并改写，见 FootnoteNormalizer 的说明。
+        val footnotes = preprocessFootnotes(balanced)
         // 内联 HTML → Markdown 标记：必须在解析前做，见 HtmlNormalizer 的说明。
-        val text = normalizeInlineHtml(balanced)
+        val text = normalizeInlineHtml(footnotes.text)
         val tree = runCatching { parser.buildMarkdownTreeFromString(text as CharSequence) }.getOrNull()
             ?: return MdDocument(emptyList(), streaming)
 
@@ -30,7 +33,19 @@ public class GfmMarkdownParser : MarkdownParser {
                 MdBlockFactory.of(text, node, "b$index")?.let(::add)
             }
         }
-        return MdDocument(mergeDetails(blocks, text), streaming)
+        val merged = mergeDetails(blocks, text)
+        if (footnotes.definitions.isEmpty()) return MdDocument(merged, streaming)
+        val items = footnotes.definitions.map { FootnoteItem(it.id, it.number, it.markdown) }
+        return MdDocument(
+            merged + MdBlock.Footnotes(
+                key = "footnotes",
+                source = text,
+                raw = footnotes.definitions.joinToString("\n") { "[^${it.id}]: ${it.markdown}" },
+                node = tree,
+                items = items,
+            ),
+            streaming,
+        )
     }
 
     /**

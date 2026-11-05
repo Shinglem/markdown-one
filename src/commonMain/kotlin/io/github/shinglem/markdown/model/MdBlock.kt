@@ -73,6 +73,22 @@ public sealed interface MdBlock {
         override val formats: Set<FormatId> get() = setOf(Formats.Markdown)
     }
 
+    /**
+     * GitHub Alerts（`> [!NOTE]` / `[!TIP]` / `[!IMPORTANT]` / `[!WARNING]` / `[!CAUTION]`）。
+     *
+     * GFM 解析器原生产出 `ALERT` 节点（标题是 `ALERT_TITLE` token，正文是其后的一串块），
+     * 所以不需要预处理。不认识的标记（`[!FOO]`）按普通引用解析，见 `MdBlockFactory`。
+     */
+    public data class Alert(
+        override val key: String,
+        override val source: String,
+        override val raw: String,
+        override val node: ASTNode,
+        public val kind: AlertKind,
+    ) : MdBlock {
+        override val formats: Set<FormatId> get() = setOf(Formats.Markdown, Formats.Alert)
+    }
+
     public data class ListBlock(
         override val key: String,
         override val source: String,
@@ -148,10 +164,56 @@ public sealed interface MdBlock {
         override val formats: Set<FormatId>
             get() = if (type.isBlank()) emptySet() else setOf(FormatId(type))
     }
+
+    /**
+     * 脚注定义区（文档末尾，由 `parse/FootnoteNormalizer.kt` 抽出来的定义）。
+     *
+     * 没有对应的 AST 节点（脚注不是 CommonMark/GFM 规范能力），[node] 用文档根节点占位；
+     * 渲染只依赖 [items]，不读节点。没有定义时解析器不会产出这个块。
+     */
+    public data class Footnotes(
+        override val key: String,
+        override val source: String,
+        override val raw: String,
+        override val node: ASTNode,
+        public val items: List<FootnoteItem>,
+    ) : MdBlock {
+        override val formats: Set<FormatId> get() = setOf(Formats.Markdown, Formats.Footnotes)
+    }
 }
+
+/** 一条脚注：序号（与正文上标一致）、id 与定义正文（Markdown）。 */
+public data class FootnoteItem(
+    public val id: String,
+    public val number: Int,
+    public val markdown: String,
+)
 
 /** 解析结果。 */
 public data class MdDocument(
     public val blocks: List<MdBlock>,
     public val streaming: Boolean,
 )
+
+/** GitHub Alerts 的 5 种类型。 */
+public enum class AlertKind {
+    Note,
+    Tip,
+    Important,
+    Warning,
+    Caution,
+    ;
+
+    public companion object {
+        /** `[!NOTE]` 里取出 `NOTE`（大小写不敏感）；不认识的标记返回 null。 */
+        public fun fromMarker(marker: String): AlertKind? =
+            when (marker.trim().lowercase()) {
+                "note" -> Note
+                "tip" -> Tip
+                "important" -> Important
+                "warning" -> Warning
+                "caution" -> Caution
+                else -> null
+            }
+    }
+}

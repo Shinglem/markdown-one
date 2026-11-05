@@ -44,6 +44,32 @@ class HtmlNormalizerTest {
     }
 
     @Test
+    fun `img 的宽高透传到 markdown 图片 title`() {
+        // 尺寸放 title 里（标准语法）：行内构建器据此约束占位框，SVG 才不会按 0 尺寸塌掉。
+        assertEquals(
+            """![badge](https://example.com/a.svg "size=120x40")""",
+            normalizeInlineHtml("""<img src="https://example.com/a.svg" alt="badge" width="120" height="40">"""),
+        )
+        assertEquals(
+            """![logo](https://example.com/b.svg "size=64x")""",
+            normalizeInlineHtml("""<img src="https://example.com/b.svg" alt="logo" width="64px">"""),
+        )
+        assertEquals(
+            """![logo](https://example.com/b.svg "size=x24")""",
+            normalizeInlineHtml("""<IMG SRC="https://example.com/b.svg" ALT="logo" HEIGHT='24'>"""),
+        )
+    }
+
+    @Test
+    fun `百分比宽高被丢弃`() {
+        // 没有布局引擎，百分比无从换算：宁可回落到图片原始尺寸，也不猜一个固定值。
+        assertEquals(
+            "![](https://example.com/a.svg)",
+            normalizeInlineHtml("""<img src="https://example.com/a.svg" width="100%">"""),
+        )
+    }
+
+    @Test
     fun `a 标签转成链接`() {
         assertEquals(
             "见 [文档](https://example.com/d)",

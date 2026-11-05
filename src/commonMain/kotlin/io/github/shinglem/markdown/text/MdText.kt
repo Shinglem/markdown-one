@@ -24,11 +24,14 @@ import androidx.compose.ui.text.Placeholder
 import androidx.compose.ui.text.PlaceholderVerticalAlign
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.BaselineShift
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.TextUnitType
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImagePainter
 import coil3.compose.rememberAsyncImagePainter
@@ -64,6 +67,7 @@ internal fun rememberMdInlineStyles(): MdInlineStyles {
             link = typography.textLink,
             code = typography.inlineCode.copy(background = colors.inlineCodeBackground).toSpanStyle(),
             highlight = SpanStyle(color = colors.highlightText, background = colors.highlightBackground),
+            footnote = SpanStyle(baselineShift = BaselineShift.Superscript, fontWeight = FontWeight.SemiBold),
             references = references,
             linkListener = LinkInteractionListener { link ->
                 (link as? LinkAnnotation.Url)?.url?.let(onLinkClick)
@@ -143,9 +147,9 @@ private fun rememberMdInlineContent(
 /**
  * 行内图片的占位框。
  *
- * 尺寸未知时先按 3em × 1.4em 占位（加载完成后按真实宽高比收敛）；
- * 已知尺寸时按「不放大、不超过可用宽度」缩放 —— 小图标保持原尺寸，
- * 大图缩到容器宽度，和浏览器的 `max-width: 100%` 行为一致。
+ * 尺寸优先级：`<img width/height>` 透传的显式尺寸 > 加载后的真实尺寸 > 默认占位（3em × 1.4em）。
+ * 显式尺寸只指定一边时，另一边按真实宽高比推（未知比例时按默认比例）。
+ * 无论哪种来源都遵守「不放大、不超过可用宽度」——与浏览器的 `max-width: 100%` 一致。
  */
 private fun imageInlineContent(
     image: MdImageRef,
@@ -154,18 +158,48 @@ private fun imageInlineContent(
     density: Density,
     fontSize: TextUnit,
 ): InlineTextContent {
-    val size = sizes[image.url]
+    val loaded = sizes[image.url]
     val fontPx = if (fontSize.type == TextUnitType.Sp) with(density) { fontSize.toPx() } else with(density) { DEFAULT_FONT_SIZE.toPx() }
-    val width: Float
-    val height: Float
-    if (size != null && size.width > 0 && size.height > 0) {
-        val cap = if (capPx > 0) capPx.toFloat() else size.width.toFloat()
-        val scale = min(1f, min(cap / size.width, cap / size.height))
-        width = size.width * scale
-        height = size.height * scale
+    val ratio = if (loaded != null && loaded.width > 0 && loaded.height > 0) {
+        loaded.height.toFloat() / loaded.width.toFloat()
     } else {
-        width = fontPx * 3f
-        height = fontPx * 1.4f
+        DEFAULT_IMAGE_RATIO
+    }
+    val explicitWidth = image.widthPx?.let { with(density) { it.dp.toPx() } }
+    val explicitHeight = image.heightPx?.let { with(density) { it.dp.toPx() } }
+    var width: Float
+    var height: Float
+    when {
+        explicitWidth != null && explicitHeight != null -> {
+            width = explicitWidth
+            height = explicitHeight
+        }
+
+        explicitWidth != null -> {
+            width = explicitWidth
+            height = explicitWidth * ratio
+        }
+
+        explicitHeight != null -> {
+            height = explicitHeight
+            width = explicitHeight / ratio
+        }
+
+        loaded != null && loaded.width > 0 && loaded.height > 0 -> {
+            width = loaded.width.toFloat()
+            height = loaded.height.toFloat()
+        }
+
+        else -> {
+            width = fontPx * 3f
+            height = fontPx * 1.4f
+        }
+    }
+    if (capPx > 0) {
+        val cap = capPx.toFloat()
+        val scale = min(1f, min(cap / width, cap / height))
+        width *= scale
+        height *= scale
     }
     return InlineTextContent(
         Placeholder(
@@ -207,4 +241,7 @@ private fun MdInlineImage(image: MdImageRef, sizes: MutableMap<String, IntSize>,
 }
 
 private val DEFAULT_FONT_SIZE = 14.sp
+
+/** 未知宽高比时的默认比例（与 3em × 1.4em 的占位一致）。 */
+private const val DEFAULT_IMAGE_RATIO = 1.4f / 3f
 
