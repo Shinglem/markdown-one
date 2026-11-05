@@ -40,6 +40,11 @@ val vCoil = "3.6.3"
  * 它传递依赖 `material3:1.10.0-alpha05`，与本仓库的 1.9.0 冲突 —— 见文件末尾的 force。
  */
 val vDiagram = "1.0.6"
+/**
+ * HTML 解析（`HtmlNativeAdapter` 用）：ksoup 是 jsoup 的 KMP 移植，行为与 jsoup 一致
+ * 但**不绑定 JVM**。不用 jsoup 是为了避免将来多端化时再换库 / 分叉 expect/actual。
+ */
+val vKsoup = "0.2.6"
 /** 公式排版引擎（io.github.huarangmeng，MIT）：Compose 原生矢量绘制 + KaTeX 字体。 */
 val vLatex = "1.6.3"
 /** 与 `gradle/libs.versions.toml` 的 `compose` 版本保持一致（仅用于 ui-test 坐标，宿主升级时同步）。 */
@@ -75,6 +80,9 @@ kotlin {
             // 注意：它会传递依赖 material3 1.10.0-alpha05，必须在本构建里 force 回稳定版
             // （见文件末尾的 resolutionStrategy）。
             implementation("io.github.huarangmeng:diagram-render:$vDiagram")
+
+            // HTML 块的原生渲染：ksoup（jsoup 的 KMP 移植，LLM 输出的未闭合标签靠它容错）
+            implementation("com.fleeksoft.ksoup:ksoup:$vKsoup")
         }
 
         // 公式排版：latex-renderer 是纯 Compose 的 LaTeX 引擎（矢量绘制 + KaTeX 字体），

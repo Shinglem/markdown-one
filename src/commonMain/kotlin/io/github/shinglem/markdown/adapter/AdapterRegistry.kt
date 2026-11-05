@@ -70,6 +70,8 @@ public fun builtinAdapters(config: MarkdownConfig): List<BlockAdapter> = listOf(
     io.github.shinglem.markdown.builtin.CodeHighlightAdapter(config),
     io.github.shinglem.markdown.builtin.FootnotesAdapter(config),
     io.github.shinglem.markdown.builtin.DetailsAdapter(config),
+    // 原生 HTML 渲染优先于「剥壳递归」兜底（priority 115 > 105）
+    io.github.shinglem.markdown.builtin.HtmlNativeAdapter(config),
     io.github.shinglem.markdown.builtin.HtmlContainerAdapter(config),
     io.github.shinglem.markdown.builtin.SourceFallbackAdapter,
 ) + platformAdapters(config)
