@@ -26,7 +26,7 @@ internal class CodeHighlightAdapter(private val config: MarkdownConfig) : BlockA
     override fun isAvailable(): Boolean = true
 
     override fun canRender(block: MdBlock): Boolean =
-        block is MdBlock.CodeBlock && !isMermaidLanguage(block.language)
+        block is MdBlock.CodeBlock && diagramLanguage(block) == null
 
     @Composable
     override fun Render(block: MdBlock, modifier: Modifier) {
@@ -38,10 +38,4 @@ internal class CodeHighlightAdapter(private val config: MarkdownConfig) : BlockA
             maxSyncHighlightLength = config.maxSyncHighlightLength,
         )
     }
-}
-
-/** 语言名是否按 mermaid 图表处理。 */
-internal fun isMermaidLanguage(language: String?): Boolean {
-    val name = language?.trim()?.lowercase() ?: return false
-    return name == "mermaid" || name == "mmd"
 }

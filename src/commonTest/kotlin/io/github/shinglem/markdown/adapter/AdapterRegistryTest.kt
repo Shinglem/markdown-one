@@ -103,9 +103,31 @@ class AdapterRegistryTest {
     @Test
     fun `内置适配器覆盖 mermaid 与普通代码`() {
         val registry = buildAdapterRegistry(MarkdownConfig())
-        assertEquals("builtin.mermaid", registry.select(codeBlock("mermaid"), streaming = false)?.id)
+        assertEquals("builtin.diagram", registry.select(codeBlock("mermaid"), streaming = false)?.id)
         assertEquals("builtin.code", registry.select(codeBlock("kotlin"), streaming = false)?.id)
         assertEquals("builtin.code", registry.select(codeBlock(""), streaming = false)?.id)
+    }
+
+    @Test
+    fun `PlantUML 与 DOT 走图表适配器`() {
+        val registry = buildAdapterRegistry(MarkdownConfig())
+        assertEquals("builtin.diagram", registry.select(codeBlock("plantuml"), streaming = false)?.id)
+        assertEquals("builtin.diagram", registry.select(codeBlock("dot"), streaming = false)?.id)
+        assertEquals("builtin.diagram", registry.select(codeBlock("graphviz"), streaming = false)?.id)
+    }
+
+    @Test
+    fun `没有语言标记但内容是图时走图表适配器`() {
+        val registry = buildAdapterRegistry(MarkdownConfig())
+        val block = parser.parse("```\ngraph TD\n    A --> B\n```", streaming = false).blocks.single()
+        assertEquals("builtin.diagram", registry.select(block, streaming = false)?.id)
+    }
+
+    @Test
+    fun `带语言标记的普通代码块不会因为内容像图而变成图表`() {
+        val registry = buildAdapterRegistry(MarkdownConfig())
+        val block = parser.parse("```kotlin\nval s = \"graph TD\"\n```", streaming = false).blocks.single()
+        assertEquals("builtin.code", registry.select(block, streaming = false)?.id)
     }
 
     @Test

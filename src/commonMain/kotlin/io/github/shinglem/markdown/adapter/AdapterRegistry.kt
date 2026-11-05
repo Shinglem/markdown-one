@@ -64,8 +64,10 @@ public fun buildAdapterRegistry(config: MarkdownConfig): AdapterRegistry {
  */
 public fun builtinAdapters(config: MarkdownConfig): List<BlockAdapter> = listOf(
     io.github.shinglem.markdown.builtin.TextBlockAdapter(config),
+    // 图表排在代码高亮之前：同优先级时先注册者胜，两者都声明 `code:*`，
+    // 由 DiagramAdapter.canRender 里的语言判定决定谁真正接手。
+    io.github.shinglem.markdown.builtin.DiagramAdapter(config),
     io.github.shinglem.markdown.builtin.CodeHighlightAdapter(config),
-    io.github.shinglem.markdown.builtin.MermaidAdapter(config),
     io.github.shinglem.markdown.builtin.FootnotesAdapter(config),
     io.github.shinglem.markdown.builtin.DetailsAdapter(config),
     io.github.shinglem.markdown.builtin.HtmlContainerAdapter(config),

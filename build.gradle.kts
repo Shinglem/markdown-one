@@ -33,7 +33,13 @@ version = "0.1.0-SNAPSHOT"
 val vIntellijMarkdown = "0.7.17"
 val vHighlights = "1.1.0"
 val vCoil = "3.6.3"
-val vMermaidCmp = "0.1.21"
+/**
+ * 图表引擎（io.github.huarangmeng，MIT）：Mermaid / PlantUML / DOT 一套渲染，纯 Compose。
+ *
+ * 取代了原先的 `io.github.swithun-liu:mermaid-compose`（只支持 mermaid、不跟随暗色主题）。
+ * 它传递依赖 `material3:1.10.0-alpha05`，与本仓库的 1.9.0 冲突 —— 见文件末尾的 force。
+ */
+val vDiagram = "1.0.6"
 /** 公式排版引擎（io.github.huarangmeng，MIT）：Compose 原生矢量绘制 + KaTeX 字体。 */
 val vLatex = "1.6.3"
 /** 与 `gradle/libs.versions.toml` 的 `compose` 版本保持一致（仅用于 ui-test 坐标，宿主升级时同步）。 */
@@ -65,8 +71,10 @@ kotlin {
             // 徽章、远程插图都是 http(s) URL：没有 network fetcher 时 Coil 一律加载失败
             implementation("io.coil-kt.coil3:coil-network-ktor3:$vCoil")
 
-            // mermaid 纯 Kotlin 引擎（无 WebView），ADR 见 .design
-            implementation("io.github.swithun-liu:mermaid-compose:$vMermaidCmp")
+            // 图表引擎（Mermaid / PlantUML / DOT 共用一套纯 Compose 渲染，无 WebView）。
+            // 注意：它会传递依赖 material3 1.10.0-alpha05，必须在本构建里 force 回稳定版
+            // （见文件末尾的 resolutionStrategy）。
+            implementation("io.github.huarangmeng:diagram-render:$vDiagram")
         }
 
         // 公式排版：latex-renderer 是纯 Compose 的 LaTeX 引擎（矢量绘制 + KaTeX 字体），
@@ -88,4 +96,11 @@ kotlin {
             implementation(compose.desktop.currentOs)
         }
     }
+}
+
+// diagram-render 传递依赖 material3 1.10.0-alpha05，而本仓库（以及宿主 composeApp）用的是
+// 1.9.0 稳定线。alpha05 版本号更高会赢，实测会导致运行时崩溃 —— 这里强制拉回 1.9.0。
+// 宿主构建同样要在自己的配置里 force 一次（README「依赖」章节有说明）。
+configurations.configureEach {
+    resolutionStrategy.force("org.jetbrains.compose.material3:material3:1.9.0")
 }
