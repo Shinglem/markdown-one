@@ -39,6 +39,7 @@ import io.github.shinglem.markdown.adapter.Formats
 import io.github.shinglem.markdown.model.MdBlock
 import io.github.shinglem.markdown.parse.HtmlNode
 import io.github.shinglem.markdown.parse.HtmlSanitizer
+import io.github.shinglem.markdown.parse.HtmlStyle
 import io.github.shinglem.markdown.text.HtmlImageRef
 import io.github.shinglem.markdown.text.HtmlInlineStyles
 import io.github.shinglem.markdown.text.LocalMdColors
@@ -164,20 +165,25 @@ private fun HtmlBlockElement(element: HtmlNode.Element, depth: Int, style: TextS
     val padding = LocalMdPadding.current
     val dens = LocalMdDimens.current
     val colors = LocalMdColors.current
-    val align = element.style.textAlign
+    // `<center>` 的语义就是居中；`align` 属性已在清洗阶段并入 textAlign。
+    val htmlStyle = if (element.style.textAlign == null && element.tag == "center") {
+        element.style.copy(textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+    } else {
+        element.style
+    }
     when (element.tag) {
         "h1", "h2", "h3", "h4", "h5", "h6" -> {
             val level = element.tag.last().digitToInt()
             HtmlInlineLine(
                 element.children,
-                typography.heading(level).mergeAlign(align),
+                typography.heading(level).mergeHtml(htmlStyle),
                 Modifier.fillMaxWidth().padding(vertical = padding.block),
             )
         }
 
         "p" -> HtmlInlineLine(
             element.children,
-            style.mergeAlign(align),
+            style.mergeHtml(htmlStyle),
             Modifier.fillMaxWidth().padding(vertical = padding.block),
         )
 
@@ -186,7 +192,7 @@ private fun HtmlBlockElement(element: HtmlNode.Element, depth: Int, style: TextS
                 element.children,
                 Modifier.fillMaxWidth().padding(vertical = 2.dp),
                 depth + 1,
-                style.mergeAlign(align ?: if (element.tag == "center") androidx.compose.ui.text.style.TextAlign.Center else null),
+                style.mergeHtml(htmlStyle),
             )
 
         "blockquote" -> Column(
@@ -392,6 +398,20 @@ internal fun groupHtmlRuns(nodes: List<HtmlNode>): List<HtmlRun> {
 
 private fun TextStyle.mergeAlign(align: androidx.compose.ui.text.style.TextAlign?): TextStyle =
     if (align == null) this else copy(textAlign = align)
+
+/**
+ * 把 HTML 的 `style` 子集并入块级 [TextStyle]。
+ *
+ * 布局属性（display / flex / position / margin…）压根没进 [HtmlStyle]，所以这里不用二次过滤。
+ * 之前只并了 textAlign，导致 `<div style="font-size:28px">` 这类块级字号被丢掉（实测）。
+ */
+private fun TextStyle.mergeHtml(html: HtmlStyle): TextStyle = copy(
+    color = html.color ?: color,
+    fontSize = html.fontSize ?: fontSize,
+    fontWeight = html.fontWeight ?: fontWeight,
+    fontStyle = html.fontStyle ?: fontStyle,
+    textAlign = html.textAlign ?: textAlign,
+)
 
 private fun bulletFor(depth: Int): String = when (depth % 3) {
     1 -> "◦"

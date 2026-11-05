@@ -346,7 +346,7 @@ private val FIXTURES = listOf(
         </ul>
 
         <pre><code>val html = "&lt;div&gt;"
-println(html)</code></pre>
+        println(html)</code></pre>
 
         <table border="1">
           <tr><th>列 A</th><th>列 B</th></tr>
@@ -354,6 +354,32 @@ println(html)</code></pre>
         </table>
 
         <div>前<script>alert('不应执行')</script>后（脚本子树被整棵丢弃）</div>
+        """.trimIndent(),
+    ),
+    Fixture(
+        "Alerts 与脚注",
+        """
+        # Alerts 与脚注
+
+        > [!NOTE]
+        > 有用信息：这一段是 NOTE。
+
+        > [!TIP]
+        > 小技巧：这一段是 TIP。
+
+        > [!IMPORTANT]
+        > 关键：这一段是 IMPORTANT。
+
+        > [!WARNING]
+        > 注意：这一段是 WARNING。
+
+        > [!CAUTION]
+        > 危险：这一段是 CAUTION。
+
+        正文引用一条脚注[^1]，再引用一条带格式的[^2]。
+
+        [^1]: 第一条脚注的内容。
+        [^2]: 第二条脚注，里面有 `行内码` 与**粗体**。
         """.trimIndent(),
     ),
     Fixture(

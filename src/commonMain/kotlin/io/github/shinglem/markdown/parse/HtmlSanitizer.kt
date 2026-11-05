@@ -182,7 +182,16 @@ internal object HtmlSanitizer {
                 else -> style
             }
         }
+        // 传统 `align` 属性（`<div align="center">`）：没有 style 时也要生效 —— 对话里这种写法很常见。
+        if (style.textAlign == null) style = style.copy(textAlign = parseAlignAttr(element.attr("align")))
         return style
+    }
+
+    private fun parseAlignAttr(raw: String?): TextAlign? = when (raw?.trim()?.lowercase()) {
+        "center", "middle" -> TextAlign.Center
+        "right" -> TextAlign.End
+        "left", "start" -> TextAlign.Start
+        else -> null
     }
 
     /** 只支持纯数字（px / pt / em 的倍率按 16sp 折算），百分比一律忽略。 */

@@ -129,12 +129,91 @@ private class HtmlInlineWalker(private val styles: HtmlInlineStyles) {
             return
         }
         if (collapsed.startsWith(' ') && current > 0) builder.append(' ')
-        builder.append(body)
+        appendMarkdownMarkers(body)
         if (collapsed.endsWith(' ')) builder.append(' ')
+    }
+
+    /**
+     * 文本节点里的 Markdown 标记还原成样式。
+     *
+     * `HtmlNormalizer` 在解析前就把 `<b>` / `<i>` / `<del>` / `<code>` / `<a>` / `<img>`
+     * 改写成等价 Markdown 标记（行内 HTML 与 HTML 块走的是同一条预处理），
+     * 所以 HTML 块里的文本节点本身就带着 `**粗体**`、`` `行内码` ``、`[文字](url)`。
+     * 不还原的话界面上会看到裸露的星号与括号（实测）。
+     */
+    private fun appendMarkdownMarkers(text: String) {
+        var cursor = 0
+        for (match in INLINE_MARKER.findAll(text)) {
+            if (match.range.first > cursor) builder.append(text.substring(cursor, match.range.first))
+            val groups = match.groups
+            when {
+                groups[1] != null -> {
+                    builder.pushStyle(SpanStyle(fontWeight = FontWeight.Bold))
+                    appendMarkdownMarkers(groups[1]!!.value)
+                    builder.pop()
+                }
+
+                groups[2] != null -> {
+                    builder.pushStyle(SpanStyle(textDecoration = TextDecoration.LineThrough))
+                    appendMarkdownMarkers(groups[2]!!.value)
+                    builder.pop()
+                }
+
+                groups[3] != null -> {
+                    builder.pushStyle(styles.code)
+                    builder.append(groups[3]!!.value)
+                    builder.pop()
+                }
+
+                groups[4] != null -> {
+                    builder.pushStyle(SpanStyle(fontStyle = FontStyle.Italic))
+                    appendMarkdownMarkers(groups[4]!!.value)
+                    builder.pop()
+                }
+
+                groups[6] != null -> {
+                    val ref = HtmlImageRef(
+                        key = HTML_IMAGE_KEY_PREFIX + groups[6]!!.value,
+                        src = groups[6]!!.value,
+                        alt = groups[5]?.value?.ifBlank { null },
+                        widthPx = null,
+                        heightPx = null,
+                    )
+                    images += ref
+                    builder.appendInlineContent(ref.key, ref.alt ?: ref.src)
+                }
+
+                groups[8] != null -> {
+                    builder.withLink(
+                        LinkAnnotation.Url(groups[8]!!.value, styles.link, styles.linkListener),
+                    ) {
+                        appendMarkdownMarkers(groups[7]!!.value)
+                    }
+                }
+            }
+            cursor = match.range.last + 1
+        }
+        if (cursor < text.length) builder.append(text.substring(cursor))
     }
 
     private companion object {
         val WHITESPACE = Regex("""\s+""")
+
+        /**
+         * 顺序即优先级：`**` 必须在 `*` 之前，图片 `![` 必须在链接 `[` 之前。
+         *
+         * 分组：1 粗体 / 2 删除线 / 3 行内码 / 4 斜体 / 5 图片 alt / 6 图片 src / 7 链接文字 / 8 链接地址。
+         */
+        val INLINE_MARKER = Regex(
+            listOf(
+                """\*\*(.+?)\*\*""",
+                """~~(.+?)~~""",
+                """`([^`]+)`""",
+                """\*([^*\n]+?)\*""",
+                """!\[([^\]]*)]\(([^)\s]+)\)""",
+                """\[([^\]]+)]\(([^)\s]+)\)""",
+            ).joinToString("|"),
+        )
     }
 }
 
