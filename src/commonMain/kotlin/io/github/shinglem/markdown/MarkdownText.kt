@@ -7,19 +7,28 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.key
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import io.github.shinglem.markdown.adapter.LocalIsStreaming
 import io.github.shinglem.markdown.adapter.buildAdapterRegistry
+import io.github.shinglem.markdown.model.MdBlock
 import io.github.shinglem.markdown.parse.GfmMarkdownParser
 import io.github.shinglem.markdown.text.LocalMdAdapterRegistry
+import io.github.shinglem.markdown.text.LocalMdAnchorScroll
+import io.github.shinglem.markdown.text.headingAnchor
+import io.github.shinglem.markdown.text.FOOTNOTE_ANCHOR_PREFIX
+import kotlinx.coroutines.launch
 import io.github.shinglem.markdown.text.LocalMdColors
 import io.github.shinglem.markdown.text.LocalMdDimens
 import io.github.shinglem.markdown.text.LocalMdMathContent
@@ -88,6 +97,22 @@ public fun MarkdownText(
     var preview by remember(markdown) { mutableStateOf<Pair<String, String>?>(null) }
     val onImageClick: (String, String) -> Unit = { url, alt -> preview = url to alt }
 
+    // ---- 文内跳转（锚点）----
+    // 锚点 id 由块本身决定：标题用 slug，脚注区用固定 id。跳转时按 id 找块，再请求把它滚进视野。
+    val anchorOf: Map<String, String> = remember(document.blocks) {
+        document.blocks.mapNotNull { block ->
+            anchorIdOf(block)?.let { anchor -> block.key to anchor }
+        }.toMap()
+    }
+    val anchorKeys: Map<String, String> = remember(anchorOf) { anchorOf.entries.associate { (key, anchor) -> anchor to key } }
+    val requesters = remember(markdown) { mutableMapOf<String, BringIntoViewRequester>() }
+    val anchorScope = rememberCoroutineScope()
+    val onAnchorScroll: (String) -> Unit = { fragment ->
+        val target = resolveAnchorKey(fragment, anchorKeys)
+        val requester = target?.let { requesters[it] }
+        if (requester != null) anchorScope.launch { runCatching { requester.bringIntoView() } }
+    }
+
     Box(
         modifier = if (theme != null && theme.background != Color.Unspecified) {
             modifier.background(theme.background)
@@ -106,6 +131,7 @@ public fun MarkdownText(
             LocalMdAdapterRegistry provides registry,
             LocalMdOnLinkClick provides config.onLinkClick,
             LocalMdOnImageClick provides onImageClick,
+            LocalMdAnchorScroll provides onAnchorScroll,
             LocalMdMaxSyncHighlightLength provides config.maxSyncHighlightLength,
         ) {
             // 选择框只包一次：每块一个 SelectionContainer 会让跨块选区断成若干段。
@@ -119,15 +145,29 @@ public fun MarkdownText(
                                 config.diagnostics.onRoute(block.key, block.formats, adapter.id, adapter.kind)
                             }
                             key(block.key) {
+                                val anchor = anchorOf[block.key]
                                 val blockContent: @Composable () -> Unit = {
-                                    adapter.Render(block, if (fillWidth) Modifier.fillMaxWidth() else Modifier)
+                                    adapter.Render(
+                                        block,
+                                        if (fillWidth) Modifier.fillMaxWidth() else Modifier,
+                                    )
                                 }
                                 val needsViewport = config.viewport.enabled &&
                                     config.viewport.matches(block.formats.map { it.value }.toSet())
-                                if (needsViewport) {
-                                    BlockViewport(config.viewport, blockContent)
+                                val inner = @Composable {
+                                    if (needsViewport) {
+                                        BlockViewport(config.viewport, blockContent)
+                                    } else {
+                                        blockContent()
+                                    }
+                                }
+                                if (anchor != null) {
+                                    // 锚点挂在块的最外层：跳转要把整块（含视口）滚进视野
+                                    val requester = remember(block.key) { BringIntoViewRequester() }
+                                    SideEffect { requesters[block.key] = requester }
+                                    Box(Modifier.bringIntoViewRequester(requester)) { inner() }
                                 } else {
-                                    blockContent()
+                                    inner()
                                 }
                             }
                         }
@@ -141,4 +181,34 @@ public fun MarkdownText(
     preview?.let { (url, alt) ->
         MdImagePreview(url = url, alt = alt, onDismiss = { preview = null })
     }
+}
+
+/** 脚注区的锚点 id（`#fn-xxx` 找不到精确目标时回退到它）。 */
+private const val ANCHOR_FOOTNOTES = "footnotes"
+
+/**
+ * 块 → 锚点 id。
+ *
+ * - 标题：GitHub 风格的 slug（`## 快速开始` → `快速开始`）；
+ * - 脚注区：固定 id，供 `#fn-<id>` 回退用（逐条定位要拆脚注渲染，收益不抵复杂度）。
+ */
+private fun anchorIdOf(block: MdBlock): String? = when (block) {
+    is MdBlock.Heading -> headingAnchor(block.raw.trimStart('#').trim()).takeIf { it.isNotEmpty() }
+    is MdBlock.Footnotes -> ANCHOR_FOOTNOTES
+    else -> null
+}
+
+/**
+ * 把链接里的片段解析成块的 key。
+ *
+ * 顺序：精确匹配 → 对片段再做一次 slug 归一化（作者写的锚点可能带空格/大写）→
+ * `fn-` 前缀回退到脚注区。都找不到返回 null（静默，不报错也不打开浏览器）。
+ */
+internal fun resolveAnchorKey(fragment: String, anchorKeys: Map<String, String>): String? {
+    val raw = fragment.removePrefix("#").trim()
+    if (raw.isEmpty()) return null
+    anchorKeys[raw]?.let { return it }
+    anchorKeys[headingAnchor(raw)]?.let { return it }
+    if (raw.startsWith(FOOTNOTE_ANCHOR_PREFIX)) return anchorKeys[ANCHOR_FOOTNOTES]
+    return null
 }

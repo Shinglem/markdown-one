@@ -60,6 +60,14 @@ internal val LocalMdOnImageClick = staticCompositionLocalOf<(String, String) -> 
 internal val LocalMdMaxSyncHighlightLength = staticCompositionLocalOf { 8_000 }
 
 /**
+ * 文内跳转：`#标题` / `#fn-xxx` 这类**片段链接**的目标。
+ *
+ * 库自己处理（滚动到对应块并高亮），宿主不必实现 —— 以前这类链接被当成普通外链
+ * 交给宿主 `openExternalUrl`，于是点脚注序号、点 AI 生成的目录都毫无反应。
+ */
+internal val LocalMdAnchorScroll = staticCompositionLocalOf<(String) -> Unit> { {} }
+
+/**
  * 从当前主题拼出行内构建需要的样式。
  *
  * 在这里（而不是构建函数内部）读 CompositionLocal，是为了让构建函数保持纯函数、
@@ -71,7 +79,8 @@ internal fun rememberMdInlineStyles(): MdInlineStyles {
     val typography = LocalMdTypography.current
     val references = LocalMdReferences.current
     val onLinkClick = LocalMdOnLinkClick.current
-    return remember(colors, typography, references, onLinkClick) {
+    val onAnchorScroll = LocalMdAnchorScroll.current
+    return remember(colors, typography, references, onLinkClick, onAnchorScroll) {
         MdInlineStyles(
             link = typography.textLink,
             code = typography.inlineCode.copy(background = colors.inlineCodeBackground).toSpanStyle(),
@@ -79,11 +88,16 @@ internal fun rememberMdInlineStyles(): MdInlineStyles {
             footnote = SpanStyle(baselineShift = BaselineShift.Superscript, fontWeight = FontWeight.SemiBold),
             references = references,
             linkListener = LinkInteractionListener { link ->
-                (link as? LinkAnnotation.Url)?.url?.let(onLinkClick)
+                val url = (link as? LinkAnnotation.Url)?.url ?: return@LinkInteractionListener
+                if (isAnchorLink(url)) onAnchorScroll(url.removePrefix("#")) else onLinkClick(url)
             },
         )
     }
 }
+
+/** 是不是文内锚点（`#foo`）—— 这类链接交给自己滚动，不打开浏览器。 */
+internal fun isAnchorLink(url: String): Boolean =
+    url.startsWith("#") && url.length > 1 && !url.startsWith("##")
 
 /** 一段行内文本（纯文本节点）。 */
 @Composable
