@@ -1,9 +1,13 @@
 package io.github.shinglem.markdown.builtin
 
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -72,11 +76,24 @@ internal class DesktopMathAdapter(private val config: MarkdownConfig) : BlockAda
             return
         }
 
-        Box(
+        // 超出容器宽度时横向滚动，否则居中。
+        //
+        // 公式宽度只有排版后才知道（`DisplayList` 不给尺寸），所以用「内层至少占满容器」的写法：
+        // 内容窄 → 内层宽度 = 容器宽度 → 居中生效；内容宽 → 内层宽度 = 内容宽度 → 可横向滚动。
+        // 直接套 `horizontalScroll` 而不加 `widthIn(min=…)` 的话，居中会失效（子项宽度变成自身宽度）。
+        BoxWithConstraints(
             modifier.fillMaxWidth().padding(vertical = 6.dp),
-            contentAlignment = if (math.display) Alignment.Center else Alignment.CenterStart,
         ) {
-            RaTeX(displayList, Modifier, fontSize)
+            val available = maxWidth
+            val scroll = rememberScrollState()
+            Box(Modifier.fillMaxWidth().horizontalScroll(scroll)) {
+                Box(
+                    Modifier.widthIn(min = available),
+                    contentAlignment = if (math.display) Alignment.Center else Alignment.CenterStart,
+                ) {
+                    RaTeX(displayList, Modifier, fontSize)
+                }
+            }
         }
     }
 }

@@ -1,8 +1,12 @@
 package io.github.shinglem.markdown
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.InlineTextContent
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.ScrollAxisRange
 import androidx.compose.ui.semantics.SemanticsNode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
@@ -10,6 +14,7 @@ import androidx.compose.ui.test.ComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.runComposeUiTest
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.test.Test
 import kotlin.test.assertFalse
@@ -64,6 +69,49 @@ class RatexRenderTest {
         val text = renderedText()
         assertFalse(text.contains("$$"), "块级公式不应以源码出现，实际=$text")
         assertFalse(text.contains("E = mc^2"), "块级公式不应以纯文本出现，实际=$text")
+    }
+
+    @Test
+    fun `超宽块级公式可以横向滚动`() = runComposeUiTest {
+        // 20 项求和在 16sp 下约 730sp 宽，放进 240dp 的容器必然溢出
+        val wide = "a_1+a_2+a_3+a_4+a_5+a_6+a_7+a_8+a_9+a_{10}+a_{11}+a_{12}" +
+            "+a_{13}+a_{14}+a_{15}+a_{16}+a_{17}+a_{18}+a_{19}+a_{20}"
+        setContent {
+            MaterialTheme {
+                Box(Modifier.width(240.dp)) {
+                    MarkdownText("$$\n$wide\n$$")
+                }
+            }
+        }
+        waitForIdle()
+        val range = horizontalScrollRange()
+        assertTrue(range != null, "超宽公式应包一层横向滚动")
+        assertTrue(range.maxValue() > 0f, "滚动范围应大于 0，实际=$range")
+    }
+
+    @Test
+    fun `短公式不产生滚动范围`() = runComposeUiTest {
+        setContent {
+            MaterialTheme {
+                Box(Modifier.width(400.dp)) {
+                    MarkdownText("$$\nE = mc^2\n$$")
+                }
+            }
+        }
+        waitForIdle()
+        val range = horizontalScrollRange()
+        // 短公式仍可能有滚动容器（实现统一），但范围必须是 0；有范围就说明误判了宽度
+        assertTrue(range == null || range.maxValue() == 0f, "短公式不该出现可滚动范围，实际=$range")
+    }
+
+    private fun ComposeUiTest.horizontalScrollRange(): ScrollAxisRange? {
+        var found: ScrollAxisRange? = null
+        fun walk(node: SemanticsNode) {
+            node.config.getOrNull(SemanticsProperties.HorizontalScrollAxisRange)?.let { found = it }
+            node.children.forEach(::walk)
+        }
+        walk(onRoot().fetchSemanticsNode())
+        return found
     }
 
     private fun ComposeUiTest.renderedText(): String {
