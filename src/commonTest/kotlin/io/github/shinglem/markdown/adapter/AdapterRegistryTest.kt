@@ -39,7 +39,7 @@ class AdapterRegistryTest {
     @Test
     fun `code 通配命中带语言名的代码块`() {
         val registry = AdapterRegistry(listOf(FakeAdapter("code", accepts = setOf(Formats.Code))))
-        val picked = registry.select(codeBlock("kotlin"), streaming = false, allowJcef = true)
+        val picked = registry.select(codeBlock("kotlin"))
         assertEquals("code", picked?.id)
     }
 
@@ -51,7 +51,7 @@ class AdapterRegistryTest {
                 FakeAdapter("high", priority = 900, accepts = setOf(Formats.Code)),
             ),
         )
-        assertEquals("high", registry.select(codeBlock("kotlin"), streaming = false)?.id)
+        assertEquals("high", registry.select(codeBlock("kotlin"))?.id)
     }
 
     @Test
@@ -62,72 +62,77 @@ class AdapterRegistryTest {
                 FakeAdapter("on", priority = 10, accepts = setOf(Formats.Code)),
             ),
         )
-        assertEquals("on", registry.select(codeBlock("kotlin"), streaming = false)?.id)
-    }
-
-    @Test
-    fun `流式期间 JCEF 适配器不参与`() {
-        val registry = AdapterRegistry(
-            listOf(
-                FakeAdapter("web", kind = AdapterKind.Jcef, priority = 900, accepts = setOf(Formats.Code)),
-                FakeAdapter("native", priority = 10, accepts = setOf(Formats.Code)),
-            ),
-        )
-        assertEquals("web", registry.select(codeBlock("kotlin"), streaming = false)?.id)
-        assertEquals("native", registry.select(codeBlock("kotlin"), streaming = true)?.id)
+        assertEquals("on", registry.select(codeBlock("kotlin"))?.id)
     }
 
     @Test
     fun `没有任何适配器命中时由兜底接管`() {
         val block = codeBlock("kotlin")
         val registry = AdapterRegistry(listOf(SourceFallbackForTest))
-        assertEquals("test.fallback", registry.select(block, streaming = false)?.id)
+        assertEquals("test.fallback", registry.select(block)?.id)
     }
 
     @Test
     fun `显式注册同 id 覆盖内置`() {
         val custom = FakeAdapter("builtin.source", priority = 500, accepts = setOf(Formats.Any))
         val registry = buildAdapterRegistry(MarkdownConfig(adapters = listOf(custom)))
-        assertEquals("builtin.source", registry.select(codeBlock("text"), streaming = false)?.id)
+        assertEquals("builtin.source", registry.select(codeBlock("text"))?.id)
         assertEquals(500, registry.all.first { it.id == "builtin.source" }.priority)
     }
 
     @Test
     fun `disabledAdapterIds 可以关掉内置适配器`() {
         val registry = buildAdapterRegistry(MarkdownConfig(disabledAdapterIds = setOf("builtin.code")))
-        val picked = registry.select(codeBlock("kotlin"), streaming = false)
+        val picked = registry.select(codeBlock("kotlin"))
         assertNotNull(picked)
         assertTrue(picked.id != "builtin.code")
     }
 
     @Test
+    fun `原始 HTML 块优先走原生渲染`() {
+        val registry = buildAdapterRegistry(MarkdownConfig())
+        val html = parser.parse("<div align=\"center\">hi</div>", streaming = false).blocks.single()
+        assertEquals("builtin.html.native", registry.select(html)?.id)
+        // 关掉原生渲染就退回「剥壳递归」的兜底实现，仍然不留空白
+        val fallback = buildAdapterRegistry(MarkdownConfig(disabledAdapterIds = setOf("builtin.html.native")))
+        assertEquals("builtin.html", fallback.select(html)?.id)
+    }
+
+    @Test
+    fun `脚注块走脚注适配器`() {
+        val registry = buildAdapterRegistry(MarkdownConfig())
+        val block = parser.parse("正文[^a]\n\n[^a]: 内容\n", streaming = false).blocks.last()
+        assertEquals("builtin.footnotes", registry.select(block)?.id)
+    }
+
+    @Test
     fun `内置适配器覆盖 mermaid 与普通代码`() {
         val registry = buildAdapterRegistry(MarkdownConfig())
-        assertEquals("builtin.diagram", registry.select(codeBlock("mermaid"), streaming = false)?.id)
-        assertEquals("builtin.code", registry.select(codeBlock("kotlin"), streaming = false)?.id)
-        assertEquals("builtin.code", registry.select(codeBlock(""), streaming = false)?.id)
+        assertEquals("builtin.diagram", registry.select(codeBlock("mermaid"))?.id)
+        assertEquals("builtin.code", registry.select(codeBlock("kotlin"))?.id)
+        assertEquals("builtin.code", registry.select(codeBlock(""))?.id)
     }
 
     @Test
     fun `PlantUML 与 DOT 走图表适配器`() {
         val registry = buildAdapterRegistry(MarkdownConfig())
-        assertEquals("builtin.diagram", registry.select(codeBlock("plantuml"), streaming = false)?.id)
-        assertEquals("builtin.diagram", registry.select(codeBlock("dot"), streaming = false)?.id)
-        assertEquals("builtin.diagram", registry.select(codeBlock("graphviz"), streaming = false)?.id)
+        assertEquals("builtin.diagram", registry.select(codeBlock("plantuml"))?.id)
+        assertEquals("builtin.diagram", registry.select(codeBlock("dot"))?.id)
+        assertEquals("builtin.diagram", registry.select(codeBlock("graphviz"))?.id)
     }
 
     @Test
     fun `没有语言标记但内容是图时走图表适配器`() {
         val registry = buildAdapterRegistry(MarkdownConfig())
         val block = parser.parse("```\ngraph TD\n    A --> B\n```", streaming = false).blocks.single()
-        assertEquals("builtin.diagram", registry.select(block, streaming = false)?.id)
+        assertEquals("builtin.diagram", registry.select(block)?.id)
     }
 
     @Test
     fun `带语言标记的普通代码块不会因为内容像图而变成图表`() {
         val registry = buildAdapterRegistry(MarkdownConfig())
         val block = parser.parse("```kotlin\nval s = \"graph TD\"\n```", streaming = false).blocks.single()
-        assertEquals("builtin.code", registry.select(block, streaming = false)?.id)
+        assertEquals("builtin.code", registry.select(block)?.id)
     }
 
     @Test
@@ -141,7 +146,7 @@ class AdapterRegistryTest {
     fun `没有匹配格式时返回空`() {
         val registry = AdapterRegistry(listOf(FakeAdapter("code", accepts = setOf(Formats.Code))))
         val paragraph = parser.parse("普通段落", streaming = false).blocks.single()
-        assertNull(registry.select(paragraph, streaming = false))
+        assertNull(registry.select(paragraph))
     }
 
     @Test
@@ -149,7 +154,7 @@ class AdapterRegistryTest {
         val custom = FakeAdapter("demo.math", priority = 120, accepts = setOf(Formats.Math))
         val registry = buildAdapterRegistry(MarkdownConfig(adapters = listOf(custom)))
         val math = parser.parse("$$\nE = mc^2\n$$", streaming = false).blocks.single()
-        assertEquals("demo.math", registry.select(math, streaming = false)?.id)
+        assertEquals("demo.math", registry.select(math)?.id)
     }
 }
 

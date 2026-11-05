@@ -20,7 +20,7 @@ public fun MarkdownText(
 |---|---|
 | `markdown` | Markdown 源码。**直接传原文**，不要预先转义或做 WYSIWYG 转换 |
 | `modifier` | 作用在最外层 `Box` 上 |
-| `streaming` | 流式输出中：图表先占位、未闭合栅栏会被补齐、`kind = Jcef` 的适配器被跳过 |
+| `streaming` | 流式输出中：图表只显示占位、未闭合栅栏会被补齐 |
 | `config` | 见下表。`remember(config)` 会重建 registry，所以**不要每次重组都 new 一个** |
 
 内部会自己铺整套渲染层 `CompositionLocal`（`text/` 包里的 `LocalMdColors` / `LocalMdTypography` /
@@ -33,15 +33,11 @@ public fun MarkdownText(
 public data class MarkdownConfig(
     public val adapters: List<BlockAdapter> = emptyList(),
     public val disabledAdapterIds: Set<String> = emptySet(),
-    public val jcefDuringStreaming: Boolean = false,
     public val allowRawHtml: Boolean = false,
-    public val webFallback: WebFallback = WebFallback.Source,
-    public val webFallbackHeight: Dp = 320.dp,
-    public val webDocument: ((MdBlock) -> String?)? = null,
     public val theme: MarkdownTheme? = null,
     public val viewport: BlockViewportConfig = BlockViewportConfig(),
-    public val jcefPoolSize: Int = 2,
     public val mermaidFallbackText: String = "图表语法暂不支持，已显示源码",
+    public val mathFallbackText: String = "公式排版不可用，已显示源码",
     public val maxSyncHighlightLength: Int = 8_000,
     public val onLinkClick: (String) -> Unit = {},
     public val diagnostics: AdapterDiagnostics = AdapterDiagnostics.None,
@@ -52,27 +48,15 @@ public data class MarkdownConfig(
 |---|---|---|
 | `adapters` | 空 | 显式注册的适配器，优先于内置与自动发现 |
 | `disabledAdapterIds` | 空 | 按 id 禁用（对**所有**来源生效） |
-| `jcefDuringStreaming` | false | 流式期间是否允许 JCEF 参与。默认关，避免每帧重载 Chromium |
-| `allowRawHtml` | false | 是否渲染原始 HTML 块（否则只显示源码） |
-| `webFallback` | `Source` | 原生画不出时的回落策略：`Source` / `Jcef` |
-| `webFallbackHeight` | 320.dp | 回落渲染的块高（浏览器内容在内部滚动） |
-| `webDocument` | null | `(MdBlock) -> String?`，为块生成 HTML；返回 null 表示不走回落 |
+| `allowRawHtml` | false | 保留字段：原始 HTML 块由 `builtin.html.native` 原生渲染 |
 | `theme` | null | 外观；null 表示沿用 Material 3 默认 |
 | `viewport` | `BlockViewportConfig()` | 大块限高、滚动、缩放 |
-| `jcefPoolSize` | 2 | 同时存活的浏览器实例上限 |
 | `mermaidFallbackText` | 内置文案 | 图表画不出时的提示 |
+| `mathFallbackText` | 内置文案 | 公式排不出来时的提示 |
 | `maxSyncHighlightLength` | 8000 | 超过这个长度的代码块跳过同步着色（避免卡 UI） |
 | `onLinkClick` | 空实现 | 链接点击回调；不设则不可点击 |
 | `diagnostics` | `None` | 路由与失败诊断 |
 
-## WebFallback
-
-```kotlin
-public sealed interface WebFallback {
-    public data object Source : WebFallback   // 直接显示源码，零依赖
-    public data object Jcef : WebFallback     // 内嵌浏览器（运行期反射，找不到自动退回 Source）
-}
-```
 
 ## BlockViewportConfig
 
@@ -87,7 +71,7 @@ public data class BlockViewportConfig(
     public val zoomLevels: List<Float> = listOf(
         0.4f, 0.5f, 0.6f, 0.7f, 0.8f, 0.9f, 1.0f, 1.1f, 1.25f, 1.5f, 2.0f, 2.5f,
     ),
-    public val formats: Set<String> = setOf("mermaid", "html", "table", "image.generic"),
+    public val formats: Set<String> = setOf("mermaid", "html", "table", "image.generic", "footnotes"),
 )
 ```
 
@@ -209,6 +193,8 @@ public object Formats {
     public val Mermaid: FormatId = FormatId("mermaid")
     public val Math: FormatId = FormatId("math")
     public val Html: FormatId = FormatId("html")
+    public val Alert: FormatId = FormatId("alert")
+    public val Footnotes: FormatId = FormatId("footnotes")
     public val Table: FormatId = FormatId("table")
     public val Image: FormatId = FormatId("image.generic")
     public val Any: FormatId = FormatId("*")
@@ -226,7 +212,9 @@ public object Formats {
 |---|---|
 | `markdown` | 普通 Markdown 块（标题/段落/列表/表格/引用/分割线） |
 | `code:<lang>` | 代码块，语言名小写；无语言时为 `code:` |
-| `mermaid` | mermaid 图表（`code:mermaid` 的块同时声明它） |
+| `mermaid` | 图表（`code:mermaid` 的块同时声明它；PlantUML / DOT 走 `code:<lang>`） |
+| `alert` | GitHub Alerts（与 `markdown` 并存） |
+| `footnotes` | 脚注定义区（与 `markdown` 并存） |
 | `math` | 数学公式 |
 | `html` | 原始 HTML 块 |
 | `table` | 表格（与 `markdown` 并存） |
@@ -236,7 +224,7 @@ public object Formats {
 ## 适配器 SPI
 
 ```kotlin
-public enum class AdapterKind { Native, Jcef, Fallback }
+public enum class AdapterKind { Native, Fallback }
 
 public interface BlockAdapter {
     public val id: String
@@ -261,14 +249,14 @@ public interface AdapterDiagnostics {
 }
 ```
 
-优先级约定：`Native` 100 / `Jcef` 50 / `Fallback` 0。详见 [写适配器](adapters.md)。
+优先级约定：`Native` 100 / `Fallback` 0；同优先级时**先注册者胜**。详见 [写适配器](adapters.md)。
 
 ## AdapterRegistry
 
 ```kotlin
 public class AdapterRegistry(adapters: List<BlockAdapter>) {
     public val all: List<BlockAdapter>
-    public fun select(block: MdBlock, streaming: Boolean, allowJcef: Boolean = !streaming): BlockAdapter?
+    public fun select(block: MdBlock): BlockAdapter?
 }
 
 public fun buildAdapterRegistry(config: MarkdownConfig): AdapterRegistry
@@ -284,20 +272,14 @@ public fun builtinAdapters(config: MarkdownConfig): List<BlockAdapter>
 |---|---|---|---|
 | `builtin.markdown` | Native | 100 | `markdown` |
 | `builtin.code` | Native | 100 | `code:*` |
-| `builtin.mermaid` | Native | 100 | `mermaid`、`code:mermaid` |
-| `builtin.jcef` | Jcef | 50 | `html`、`math`、`mermaid`（仅 desktop，且 `webFallback = Jcef` 时注册） |
+| `builtin.diagram` | Native | 100 | `mermaid`、`code:*`（语言名未标记时靠内容识别） |
+| `builtin.footnotes` | Native | 105 | `footnotes` |
+| `builtin.html.native` | Native | 115 | `html` |
+| `builtin.html` | Native | 105 | `html`（原生渲染失败时的剥壳递归兜底） |
+| `builtin.math` | Native | 100 | `math`（仅 desktop） |
 | `builtin.source` | Fallback | 0 | `*` |
 
-`builtin.jcef` 与 `builtin.mermaid` 在 `mermaid` 格式上重叠，但 mermaid 图默认**不会**进浏览器：
-`builtin.mermaid`（priority 100）胜出，纯 Kotlin 引擎直接绘制；它画不出的图族会**自己**降级成
-「源码 + `mermaidFallbackText` 提示」，不会路由到下一级。
-
-想让 mermaid 改走浏览器，两步：
-
-```kotlin
-MarkdownConfig(
-    webFallback = WebFallback.Jcef,
-    disabledAdapterIds = setOf("builtin.mermaid"),   // 让出 mermaid 格式
-    webDocument = { block -> if (block is MdBlock.CodeBlock) mermaidPage(block.code) else null },
-)
-```
+`builtin.diagram` 与 `builtin.code` 都声明 `code:*`，由 `canRender` 里的语言判定分工：
+`mermaid` / `plantuml` / `dot` / `graphviz` 走图表，其余走代码高亮；
+没有任何语言标记的 fence 交给 `Diagram.detectSource` 判断内容像不像图。
+画不出的图族**自己**降级成「源码 + `mermaidFallbackText` 提示」，不会路由到下一级。

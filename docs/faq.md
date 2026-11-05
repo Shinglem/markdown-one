@@ -4,9 +4,9 @@
 
 按可能性从高到低：
 
-1. **这个格式本来就没有原生适配器**。数学公式没有内置渲染器（要 KaTeX 得自己注入，
-   见 [JCEF · 开关三件套](jcef.md#开关三件套)）；原始 HTML 默认关（`allowRawHtml = false`）。
-2. **适配器 `isAvailable()` 返回 false**。比如 `webFallback = Jcef` 但运行环境不是 JBR with JCEF。
+1. **这个格式本来就没有原生适配器**。原始 HTML 白名单外的标签、冷门图族、KaTeX 扩展包语法
+   （`\ce{}` / `\SI{}`）都在这一类，会显示源码。
+2. **适配器 `isAvailable()` 返回 false**，例如 native 公式库没加载成功。
 3. **适配器的 `canRender()` 拒了它**。加 `AdapterDiagnostics` 看 `onRoute` 的 `adapterId`：
 
    ```kotlin
@@ -22,38 +22,16 @@
 
 ## 图表画不出来 / 只显示「图表语法暂不支持」
 
-`builtin.mermaid` 是纯 Kotlin 引擎，只支持一部分图族（flowchart、sequence 等）。
-不支持的语法会显示源码 + 一行提示 —— 这是刻意的降级，不是 bug。
+`builtin.diagram`（`diagram-render`）覆盖 Mermaid / PlantUML / DOT 的常见图族，
+冷门语法会显示源码 + 一行提示 —— 这是刻意的降级，不是 bug。
 
-想要完整 mermaid 语法树，就切到浏览器渲染（[API · 内置适配器](api.md#内置适配器) 末尾）。
+## 公式不显示，只看到 TeX 源码
 
-## JCEF 块占了高度但一直空白
-
-按这个顺序查：
-
-1. **JBR with JCEF 吗？** 普通 JDK 没有 `jcef` 模块。`JcefRuntime.isPresent` 为 false 时
-   会静默退回源码，看到的是源码而不是空白。
-2. **启动参数齐全吗？** `--add-modules jcef`、`--enable-native-access=jcef`、两个 `--add-opens`。
-3. **`getScreenInfo` 填了吗？** 返回 false 时 CEF 认为没有可用屏幕，`onPaint` 一帧都不来，
-   日志里也没有任何报错。这是最隐蔽的一个，见 [JCEF · 六个静默失败的坑](jcef.md#六个静默失败的坑)。
-4. **是不是文档里第一个浏览器？** 首个 `CefBrowser` 上「创建后再 `loadURL`」会丢，
-   内容必须走初始 URL —— 库已修，但如果你 fork 过 `CefEngine`，检查这里。
-
-## 第二个及以后的块显示「等待浏览器实例」
-
-这是名额机制在工作，不是错误。`jcefPoolSize`（默认 2）限制同时存活的浏览器数，
-没拿到的块显示占位，滚动到它附近会自动接手。
-
-觉得太少就调大 —— 但每个实例是一个完整的 Chromium 渲染进程（5+ 子进程），
-一块一个会把内存吃光。
-
-## 想彻底关掉 JCEF
-
-```kotlin
-MarkdownConfig(webFallback = WebFallback.Source)   // 默认值，只是显式写清楚
-```
-
-这样连 `org.cef` 都不会被探测，块直接显示源码。普通 JDK 上也是这个行为。
+1. **语法不在 KaTeX 集合里**。`ratex` 只按 KaTeX 语法集排版；`mhchem`（`\ce{}`）、
+   `siunitx`（`\SI{}`）属于扩展包，默认都不支持（GitHub 也不支持）。
+2. **native 库没加载**。`ratex` 的 dll 由 `io.github.darriousliu:ratex-native-windows-x86-64`
+   提供，必须是 `runtimeOnly` 依赖且在 classpath 上；缺了会退化成源码 + `mathFallbackText`。
+3. **公式引擎只在 desktop 注册**，其它 target 一律显示源码。
 
 ## 滚动条看不到
 
@@ -75,20 +53,26 @@ MarkdownConfig(webFallback = WebFallback.Source)   // 默认值，只是显式�
 滚动容器嵌套了。最常见的原因是把 `code` 加进了 `BlockViewportConfig.formats` ——
 代码块自带横向滚动。从 `formats` 里去掉即可。
 
-## 关掉窗口后进程不退出
-
-已知现象：demo 用 JCEF 时，窗口关闭后 JVM 可能还活着（`exitApplication` 已执行，
-但有非 daemon 线程未结束，多半来自 CEF 的全局 `CefApp`）。
-
-workaround：宿主在窗口关闭流程里显式兜底退出。库本身不强制 `exitProcess`，
-避免把宿主的其他窗口一起杀掉。这条在 [路线图](roadmap.md#2-进程退出兜底) 里。
-
 ## 流式输出时图表一直在「生成中」
 
-流式期间 `kind = Jcef` 的适配器被跳过，mermaid 会先显示占位，等 `streaming = false` 再绘制。
-这是刻意的 —— 每帧重载渲染引擎会让画面持续闪烁。
+流式期间图表适配器只显示占位，等 `streaming = false` 再真正排版。
+这是刻意的 —— 每帧全量重排会让滚动持续抖动。
 
-如果连占位都不想看到，把 `mermaid` 也加进 `disabledAdapterIds`，流式期间就只显示源码。
+如果连占位都不想看到，把 `builtin.diagram` 加进 `disabledAdapterIds`，流式期间就只显示源码。
+
+## HTML 块里的样式不生效
+
+只认 6 个能映射到 `TextStyle` 的属性：`color` / `background-color` / `font-size` /
+`font-weight` / `font-style` / `text-align`。`display` / `flex` / `grid` / `position` /
+`float` / `margin` / `padding` 一律**静默忽略** —— 渲染目标是「对话里的富文本」，
+不是「用 HTML 写页面」（依据见 GitHub 自己的 sanitizer：它连 `style` 都不允许）。
+
+## 脚注写 `[^1]` 却原样显示
+
+- 脚注是 GitHub 的**产品特性**，不是 CommonMark / GFM 规范，所以本库在解析前预处理：
+  `[^id]: 内容` 必须独占一行（可缩进续行），正文里的 `[^1]` 才会变成上标序号；
+- 引用了但没有对应定义时保持字面量（与 GitHub 一致）；
+- 代码块与行内代码里的 `[^1]` 不动。
 
 ## 超长代码块卡顿
 
@@ -110,11 +94,11 @@ MarkdownConfig(maxSyncHighlightLength = 4_000)
 
 - 全部逻辑在 `commonMain`；
 - 平台差异只有 `discoverAdapterFactories()` 与 `platformAdapters()` 两个 `expect` 函数；
-- JCEF 适配器在 `desktopMain`，其它端看不见。
+- 公式适配器（`ratex` + native dll）只在 `desktopMain`。
 
 需要加新端时的步骤见 [CONTRIBUTING · 加一个 target](../CONTRIBUTING.md#加一个-target)。
 
 ## 可以商用吗
 
-可以，[Apache-2.0](../LICENSE)。注意 mermaid 引擎、代码高亮、Coil 等依赖各自的许可证，
-见 [README · 依赖](../README.md#依赖)。
+可以，[Apache-2.0](../LICENSE)。注意图表引擎、公式引擎、HTML 解析器、代码高亮、Coil
+等依赖各自的许可证，见 [README · 依赖](../README.md#依赖)。

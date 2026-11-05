@@ -34,7 +34,6 @@ import io.github.shinglem.markdown.MarkdownConfig
 import io.github.shinglem.markdown.MarkdownText
 import io.github.shinglem.markdown.OutsidePaper
 import io.github.shinglem.markdown.OutsidePaperDark
-import io.github.shinglem.markdown.WebFallback
 import io.github.shinglem.markdown.outsidePaperTheme
 import io.github.shinglem.markdown.adapter.AdapterDiagnostics
 import io.github.shinglem.markdown.adapter.AdapterKind
@@ -108,7 +107,7 @@ private val FIXTURES = listOf(
         ```json
         {
           "adapters": [
-            { "id": "builtin.jcef", "priority": 50, "kind": "Jcef" }
+            { "id": "builtin.diagram", "priority": 100, "kind": "Native" }
           ],
           "enabled": true
         }
@@ -132,8 +131,7 @@ private val FIXTURES = listOf(
           B --> C[块序列]
           C --> D{适配器路由}
           D -->|Native| E[Compose 绘制]
-          D -->|Jcef| F[浏览器离屏]
-          D -->|都不行| G[源码兜底]
+                  D -->|都不行| G[源码兜底]
         ```
 
         ```mermaid
@@ -156,7 +154,7 @@ private val FIXTURES = listOf(
         ## 七、原始 HTML
 
         <div align="center">
-          <b>这段由 JCEF 渲染</b>；把 webFallback 改成 Source 就会显示源码。
+          <b>这段由原生 HTML 适配器渲染</b>（ksoup 清洗 → Compose 块树）。
         </div>
 
         ## 八、引用与分割线
@@ -323,26 +321,63 @@ private val FIXTURES = listOf(
         streaming = true,
     ),
     Fixture(
-        "多个 HTML 块（池上限 2）",
+        "HTML 原生渲染",
         """
-        # 浏览器实例池
+        # HTML 块原生渲染
 
-        下面有 4 个 HTML 块，但池上限是 2 —— 滚动时应看到「等待浏览器实例」的占位，
-        滚回上方时重新分配。每个块一个 Chromium 进程会把内存吃光。
+        下面几块都是**原始 HTML**，由 ksoup 清洗后交给 Compose 原生渲染：
+        标签语义（层级、列表、引用、代码、表格）保留，布局级 CSS 一律忽略。
 
-        <div align="center" style="font-size:28px">① 第一块</div>
+        <div align="center" style="font-size:28px">① 居中大字</div>
 
-        中间隔一段文字，把块拉开距离。
+        <h3>标题与段落</h3>
+        <p>这是一段 <b>粗体</b>、<i>斜体</i>、<code>行内码</code> 与
+        <a href="https://example.com">链接</a> 混排的 HTML 段落。</p>
 
-        <div align="center" style="font-size:28px">② 第二块</div>
+        <blockquote>HTML 里的引用块</blockquote>
 
-        再隔一段文字。
+        <ul>
+          <li>无序一</li>
+          <li>无序二
+            <ol>
+              <li>嵌套有序</li>
+            </ol>
+          </li>
+        </ul>
 
-        <div align="center" style="font-size:28px">③ 第三块</div>
+        <pre><code>val html = "&lt;div&gt;"
+println(html)</code></pre>
 
-        最后一段。
+        <table border="1">
+          <tr><th>列 A</th><th>列 B</th></tr>
+          <tr><td>1</td><td>2</td></tr>
+        </table>
 
-        <div align="center" style="font-size:28px">④ 第四块</div>
+        <div>前<script>alert('不应执行')</script>后（脚本子树被整棵丢弃）</div>
+        """.trimIndent(),
+    ),
+    Fixture(
+        "图表与 PlantUML",
+        """
+        ```mermaid
+        flowchart LR
+          A[开始] --> B{判断}
+          B -->|是| C[结束]
+        ```
+
+        ```plantuml
+        @startuml
+        Alice -> Bob: 请求
+        Bob --> Alice: 响应
+        @enduml
+        ```
+
+        ```dot
+        digraph G {
+          rankdir=LR
+          a -> b -> c
+        }
+        ```
         """.trimIndent(),
     ),
     Fixture(
@@ -403,8 +438,7 @@ private fun DemoScreen() {
 
     val config = remember(theme, initialZoom) {
         MarkdownConfig(
-            // 开关演示：原始 HTML 块交给 JCEF 渲染；运行环境没有 org.cef 时自动退回源码。
-            webFallback = WebFallback.Jcef,
+            // 原始 HTML 块走原生渲染（ksoup 清洗 → Compose 块树），不再需要浏览器。
             allowRawHtml = true,
             theme = theme,
             viewport = BlockViewportConfig(initialZoom = initialZoom),

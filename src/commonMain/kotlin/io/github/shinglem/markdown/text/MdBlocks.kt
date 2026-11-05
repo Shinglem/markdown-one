@@ -388,7 +388,7 @@ private fun MdRoutedBlock(source: String, node: ASTNode) {
     val registry = LocalMdAdapterRegistry.current
     val streaming = LocalIsStreaming.current
     val block = remember(source, node) { MdBlockFactory.of(source, node, "n${node.startOffset}") }
-    val adapter = remember(registry, block, streaming) { block?.let { registry?.select(it, streaming) } }
+    val adapter = remember(registry, block) { block?.let { registry?.select(it) } }
     if (block != null && adapter != null) {
         adapter.Render(block, Modifier.fillMaxWidth())
     } else {

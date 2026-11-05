@@ -10,27 +10,23 @@
 
 ## 接下来
 
-### 1. 请求拦截（安全）
+### 1. 图片策略
 
-JCEF 页面里的外链请求目前不受限，`<img src="http://tracker/...">` 会被真的请求出去。
-计划在 `CefEngine` 创建 client 时挂 `CefRequestHandler` 代理，
-`onBeforeResourceLoad` 里按宿主提供的白名单过滤，默认只放行 `data:`。
+当前用 Coil，缺「尺寸约束与失败占位的一致性处理」：`<img width/height>` 已能透传，
+Markdown 图片还没有等价写法（现在用 title 里的 `size=WxH` 兜着）。
+计划统一成一套占位/失败/最大尺寸规则，并给宿主一个「是否允许网络图片」的开关。
 
-在此之前，宿主应按 [SECURITY](../SECURITY.md#jcef-是攻击面) 里的建议自己收紧。
+### 2. 表格冻结表头与列宽拖拽
 
-### 2. 进程退出兜底
-
-用 JCEF 时关闭窗口后 JVM 可能不退出（CEF 全局实例的非 daemon 线程）。
-计划提供 `CefBootstrap.shutdown()` 与一个可选的「关窗后兜底退出」开关，
-而不是库自己悄悄 `exitProcess`。
+视口内长表格固定表头，纯 Compose 可做；列宽拖拽需要把「按权重均分」换成可覆盖的列宽状态。
 
 ### 3. 更多原生适配器
 
 | 适配器 | 说明 |
 |---|---|
-| `math` | KaTeX 走浏览器是现成路径；纯 Compose 排版需要自己写解析器，优先级低 |
-| `image` | 当前用 Coil，缺尺寸约束与失败占位的一致性处理 |
-| 表格冻结表头 | 视口内长表格固定表头，纯 Compose 可做 |
+| 代码行号 / 行高亮 | 等内置编辑器的决策，能复用同一套高亮结果 |
+| ANSI 着色 | 终端输出粘进对话时有用 |
+| Emoji 短代码 | `:smile:` 这类 GitHub 短代码 |
 
 ### 4. Android target
 
@@ -38,7 +34,8 @@ JCEF 页面里的外链请求目前不受限，`<img src="http://tracker/...">` 
 
 - `androidMain` 的 `discoverAdapterFactories()`（返回空或反射扫 dex）与 `platformAdapters()`；
 - `BlockScrollbarOverlay` 的 Android 版（触屏可以画空）；
-- Compose Desktop 专有 API 的替换（`HorizontalScrollbar` / `VerticalScrollbar` 是 desktop 的）。
+- Compose Desktop 专有 API 的替换（`HorizontalScrollbar` / `VerticalScrollbar` 是 desktop 的）；
+- 公式引擎换 Android 版 `ratex` native（或退回源码）。
 
 ### 5. Web target（Compose for Web / Wasm）
 
@@ -52,6 +49,7 @@ JCEF 页面里的外链请求目前不受限，`<img src="http://tracker/...">` 
 
 | 不做 | 原因 |
 |---|---|
+| 内嵌浏览器 / JCEF | 已移除：310 MB native、渲染进程、脚本攻击面，换来的只是「任意 HTML 完美渲染」，而对话里实际出现的 HTML 都是标签语义级别，原生渲染已覆盖 |
 | WYSIWYG 编辑器 | 本库只渲染，编辑是另一件事；输入框要自己接管 IME |
 | 内嵌 JS 插件宿主 | 前端插件返回 `ReactNode`，保留生态等于自造 WebView |
 | 多语言 UI 文案 | 当前只有中文，文案集中在 `MarkdownConfig` |

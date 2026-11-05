@@ -52,7 +52,7 @@ import io.github.shinglem.markdown.text.rememberMdInlineStyles
 /**
  * 原始 HTML 块的**原生渲染**：ksoup 解析 → 白名单清洗 → Compose 块树 + 行内 `AnnotatedString`。
  *
- * 为什么不是 JCEF：没有 310 MB 的 Chromium、没有渲染进程、没有脚本攻击面；代价只支持
+ * 为什么不用内嵌浏览器：没有 310 MB 的 Chromium、没有渲染进程、没有脚本攻击面；代价只支持
  * 「标签语义 + 极少量样式」，而这恰好是 LLM 输出 HTML 的实际形态（见 `.design/待修复问题.md` #9）。
  *
  * 与 [HtmlContainerAdapter] 的分工：那个是「剥壳后交回 Markdown 递归」的兜底，这里按 DOM 结构

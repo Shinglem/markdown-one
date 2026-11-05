@@ -11,7 +11,7 @@
 | Gradle | 9.8.0（用仓库里的 wrapper，不要用本机 Gradle） |
 | Kotlin / Compose | 见 `gradle/libs.versions.toml`，不要手动改版本号 |
 
-JCEF 相关开发额外需要 **JBR with JCEF**（`jbrsdk_jcef-*`），普通 JDK 也能构建，只是跑不了浏览器回落。
+公式渲染依赖 `ratex` 的 native 库（`runtimeOnly` 依赖自动带入，无需手工安装）；Linux / macOS 需要换对应的 `ratex-native-*` 坐标。
 
 ## 常用命令
 
@@ -87,7 +87,7 @@ KMP project 依赖要求 target 名对齐。多端化时要和宿主一起改。
 - 库版本（commit）与 JDK/JBR 版本；
 - 触发问题的 Markdown 片段（**最小复现**，越短越好）；
 - `AdapterDiagnostics` 的路由输出，或 demo 右侧面板的截图；
-- 如果是 JCEF 相关，贴出 CEF 的 native 日志（`cache_path` 目录下的 `*.log`）。
+- 如果是公式相关，贴出 `ratex` native 加载失败的堆栈（`UnsatisfiedLinkError` / `JNA` 相关）。
 
 **安全问题不要开公开 issue**，走 [SECURITY.md](SECURITY.md) 的私密通道。
 

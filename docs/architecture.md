@@ -39,8 +39,8 @@ markdown: String
 | `formats` | 该块能落到哪些格式（`Set<FormatId>`） | 路由唯一依据，一个块可以同时有多个格式 |
 | `node` | 原始 GFM AST 节点 | 需要行内信息（链接、粗体）时用 |
 
-具体类型：`Heading` / `Paragraph` / `CodeBlock` / `Quote` / `ListBlock` / `Table` / `Rule` /
-`Image` / `Html` / `Math` / `Custom`。
+具体类型：`Heading` / `Paragraph` / `CodeBlock` / `Quote` / `Alert` / `ListBlock` / `Table` /
+`Rule` / `Image` / `Html` / `Math` / `Footnotes` / `Custom`。
 
 格式映射（`formats`）的几个要点：
 
@@ -55,7 +55,6 @@ markdown: String
 
 ```
 all                                // 显式注册 → ServiceLoader 发现 → 内置，按 id 去重（先到者胜）
-  .filter { kind != Jcef || allowJcef }   // 流式期间 JCEF 不参与
   .filter { matches(block) }              // 声明的格式与 block.formats 有交集
   .filter { isAvailable() }               // 运行期探测（反射、可选依赖）
   .filter { canRender(block) }            // 比格式更细的判定
@@ -76,9 +75,9 @@ all                                // 显式注册 → ServiceLoader 发现 → 
 **禁止静默替换。** 适配器画不出这个块时，必须让路由落到下一级，不能自己换个引擎顶替。
 否则用户看到的画面与诊断面板对不上，线上排查会完全失去线索。
 
-**流式只降不升。** `streaming = true` 时 `AdapterKind.Jcef` 的适配器被整个跳过 ——
-流式每几十毫秒一次重组，每次重载 Chromium 会让画面持续闪烁并吃满 CPU。
-流式结束后自动回到正常路由，不需要调用方做任何事。
+**流式只降不升。** `streaming = true` 时重型适配器自己降级：图表只显示「生成中…」占位，
+等 `streaming = false` 再真正排版 —— 流式每几十毫秒一次重组，每次全量重排会让滚动持续抖动。
+降级由适配器读 `LocalIsStreaming` 自己决定，路由本身不区分流式。
 
 ## 布局约束
 
@@ -131,14 +130,15 @@ commonMain/                      解析、块模型、适配器 SPI、内置 Nat
  ├── adapter/BlockAdapter.kt     SPI
  ├── parse/                      JetBrains GFM AST → MdBlock
  ├── text/                       行内构建器与块组件（自研，零第三方 renderer）
- ├── builtin/                    markdown / code / mermaid / html / details / source
+ ├── builtin/                    markdown / code / diagram / footnotes / html / details / source
  └── MarkdownText.kt             唯一入口
 
 desktopMain/                     只有平台差异
  ├── adapter/AdapterDiscovery    ServiceLoader 发现（其它端返回空列表）
- ├── adapter/PlatformAdapters    注册 JCEF 回落适配器
+ ├── adapter/PlatformAdapters    注册公式适配器（ratex）
+ ├── builtin/DesktopMathAdapter  块级公式
  ├── BlockScrollbarOverlay       原生滚动条
- └── web/                        CefBootstrap / CefEngine / CefSlot / JcefBudget / JcefAdapter
+ └── InlineMath.desktop.kt       行内公式的 inline content
 ```
 
 `commonMain` 里唯一与平台有关的两个函数是 `expect` 的：
@@ -149,7 +149,7 @@ internal expect fun platformAdapters(config: MarkdownConfig): List<BlockAdapter>
 ```
 
 加新端时只需要给这两个写 `actual`：Android 用反射扫 dex 或直接返回空列表（靠显式注册），
-iOS/Web 返回空列表。JCEF 适配器在 `desktopMain` 且全程反射，其它端根本看不到 `org.cef`。
+iOS/Web 返回空列表。公式适配器只在 `desktopMain`（依赖 native dll），其它端落到 `builtin.source`。
 
 ## 线程与生命周期
 
@@ -157,12 +157,11 @@ iOS/Web 返回空列表。JCEF 适配器在 `desktopMain` 且全程反射，其�
 |---|---|---|
 | 解析 | Compose 主线程 | 纯 Kotlin，长文档也在毫秒级；`remember(markdown, streaming)` 缓存 |
 | 内置适配器渲染 | Compose 主线程 | 只做排版与绘制 |
-| JCEF 引擎创建 | 独立线程（`markdown-one-cef`） | 创建要 1–2 秒，放在 `LaunchedEffect` 里会被重组取消，见 [JCEF](jcef.md) |
-| JCEF 出帧 | CEF 线程 → `SwingUtilities.invokeLater` | 帧回调切回 Compose 线程再写 state |
-| JCEF 释放 | 独立线程（`markdown-one-cef-dispose`） | `close`/`dispose` 会等 CEF UI 线程，主线程调会卡死窗口 |
+| 公式排版（ratex） | Compose 主线程 | 同步取 DisplayList（公式很小）；取不到就显示源码 |
+| 图表排版（diagram-render） | Compose 主线程 | 纯 Kotlin 解析 + 布局，无 native、无子进程 |
+| HTML 解析（ksoup） | Compose 主线程 | 按块 `remember(block.raw)` 缓存，文档不变就不重解析 |
 
 ## 相关文档
 
 - [写适配器](adapters.md) —— SPI 每个方法的语义与陷阱
-- [JCEF 回落](jcef.md) —— 内嵌浏览器的完整接入与已知坑
 - [API 参考](api.md) —— 所有公开类型与字段

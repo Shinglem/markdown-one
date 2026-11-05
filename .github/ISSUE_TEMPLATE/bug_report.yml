@@ -58,8 +58,8 @@ body:
     id: jdk
     attributes:
       label: JDK / JBR
-      description: JCEF 相关问题请注明是否 JBR with JCEF
-      placeholder: e.g. JBR 25.0.4.1 (jbrsdk_jcef) / Temurin 25
+      description: 公式/图表相关问题请注明 JDK 版本
+      placeholder: e.g. Temurin 25.0.5 / Temurin 27
     validations:
       required: true
 
@@ -79,7 +79,7 @@ body:
     id: logs
     attributes:
       label: 日志 / 截图 / 堆栈
-      description: JCEF 相关请附 CEF 的 native 日志（cache_path 目录下的 *.log）
+      description: 公式相关问题请注明是否有 native 加载失败日志
       render: text
     validations:
       required: false

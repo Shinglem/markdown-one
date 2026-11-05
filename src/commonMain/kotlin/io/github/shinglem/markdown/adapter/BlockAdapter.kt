@@ -8,9 +8,6 @@ public enum class AdapterKind {
     /** 纯 Compose 绘制。 */
     Native,
 
-    /** 交给内嵌浏览器（JCEF）离屏渲染。 */
-    Jcef,
-
     /** 最后一级兜底：显示源码。 */
     Fallback,
 }
@@ -25,7 +22,7 @@ public enum class AdapterKind {
  *
  * 两条不可违反的纪律：
  * 1. **禁止静默替换**：画不出时必须走下一级，不能悄悄换个引擎顶替；
- * 2. **流式只降不升**：流式期间 JCEF 适配器不参与（见 [LocalIsStreaming]）。
+ * 2. **流式只降不升**：流式期间不启用来不及画完的重型适配器（见 [LocalIsStreaming]）。
  */
 public interface BlockAdapter {
     /** 唯一标识，用于配置里禁用/覆盖。 */
@@ -33,13 +30,13 @@ public interface BlockAdapter {
 
     public val kind: AdapterKind
 
-    /** 越大越优先。约定：Native 100 / Jcef 50 / Fallback 0。 */
+    /** 越大越优先。约定：Native 100 / Fallback 0。 */
     public val priority: Int
 
     /** 本适配器支持的格式。 */
     public fun formats(): Set<FormatId>
 
-    /** 运行期探测（例如 JCEF 是否可初始化）。结果应缓存，不要每次渲染都探测。 */
+    /** 运行期探测（例如 native 运行时是否可用）。结果应缓存，不要每次渲染都探测。 */
     public fun isAvailable(): Boolean
 
     /** 比格式声明更细的判定；默认放行。 */

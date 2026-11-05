@@ -14,9 +14,8 @@ public class AdapterRegistry(adapters: List<BlockAdapter>) {
     public val all: List<BlockAdapter> = adapters
 
     /** 为一个块选适配器；返回 null 表示需要由调用方走兜底。 */
-    public fun select(block: MdBlock, streaming: Boolean, allowJcef: Boolean = !streaming): BlockAdapter? =
+    public fun select(block: MdBlock): BlockAdapter? =
         all.asSequence()
-            .filter { adapter -> adapter.kind != AdapterKind.Jcef || allowJcef }
             .filter { adapter -> adapter.matches(block) }
             .filter { adapter -> adapter.isAvailable() }
             .filter { adapter -> adapter.canRender(block) }
@@ -41,7 +40,7 @@ public class AdapterRegistry(adapters: List<BlockAdapter>) {
 /** 自动发现：JVM/desktop 用 ServiceLoader，其它端返回空（靠显式注册）。 */
 internal expect fun discoverAdapterFactories(): List<BlockAdapterFactory>
 
-/** 平台专有适配器（例如 desktop 的 JCEF 回落）。 */
+/** 平台专有适配器（例如 desktop 的公式引擎）。 */
 internal expect fun platformAdapters(config: MarkdownConfig): List<BlockAdapter>
 
 /** 组装最终 registry：显式 → 自动发现 → 内置，按 id 去重（先到者胜）。 */

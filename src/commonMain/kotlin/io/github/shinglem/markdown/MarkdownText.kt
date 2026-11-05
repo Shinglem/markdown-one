@@ -102,7 +102,7 @@ public fun MarkdownText(
             val content: @Composable () -> Unit = {
                 Column(if (fillWidth) Modifier.fillMaxWidth() else Modifier) {
                     document.blocks.forEach { block ->
-                        val adapter = registry.select(block, streaming)
+                        val adapter = registry.select(block)
                         if (adapter != null) {
                             // 用块内容参与 key：切到另一个文档时块 key 仍是 b0/b1，只按 key 去重会漏报。
                             LaunchedEffect(block.key, block.raw, adapter.id) {

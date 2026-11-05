@@ -7,6 +7,41 @@
 
 尚未发布到 Maven Central，当前以 git submodule / 本地构建接入。
 
+### 新增
+
+- **GitHub Alerts**：`> [!NOTE]` / `[!TIP]` / `[!IMPORTANT]` / `[!WARNING]` / `[!CAUTION]`
+  解析成 `MdBlock.Alert`，左侧色条 + 自绘图标 + 类型标题；未知标记按普通引用处理。
+  强调色按语义固定色相、随主题明暗收敛，对比度由单测断言（≥ 4.5:1）。
+- **脚注**：脚注不是 CommonMark/GFM 规范能力，AST 里也没有节点，所以在解析前预处理
+  （`parse/FootnoteNormalizer.kt`）：抽出 `[^id]: …` 定义（支持缩进续行）、从正文移除、
+  正文引用改写成 `[n](#fn-id)` 并渲染成上标，文末由 `builtin.footnotes` 统一渲染。
+  编号按首次引用顺序；未定义引用保持字面量；代码块与行内代码里的内容不动。
+- **HTML 块原生渲染**（`builtin.html.native`）：ksoup 解析 → 白名单清洗 → Compose 块树 +
+  行内 `AnnotatedString`。白名单照 GitHub sanitizer（60 个元素，**没有 `class` / `on*`**），
+  `style` 只解析 6 个能映射到 `TextStyle` 的属性，布局级属性静默忽略；
+  限深 32、限节点 5000，超限整块回落源码。
+- **PlantUML / Graphviz DOT**：图表适配器扩到 `plantuml` / `puml` / `dot` / `graphviz`，
+  没有语言标记的 fence 由 `Diagram.detectSource` 按内容识别。
+
+### 变更
+
+- **图表引擎换成 `io.github.huarangmeng:diagram-render:1.0.6`**（MIT），删除
+  `io.github.swithun-liu:mermaid-compose`（不做并存）。新引擎跟随 `MaterialTheme.colorScheme`
+  （旧引擎硬编码白底，暗色主题里刺眼），并自带 PlantUML / DOT。它会传递依赖
+  `material3:1.10.0-alpha05`，构建里必须 `resolutionStrategy.force` 回 1.9.0。
+- **公式引擎换成 `io.github.darriousliu:ratex:0.1.15`**（MIT，Rust 核心 + Compose 绘制），
+  删除 `latex-renderer` + `latex-fonts-katex`。14 个高级用例实测：`\mathbb` / `\mathcal`、
+  `\left\{`、`\operatorname` 正体、`\xrightarrow` 长度、align 逐行编号都更正确。
+  native 部分由 `ratex-native-windows-x86-64` 提供（`runtimeOnly`）。
+- `<img width/height>` 的尺寸经 Markdown 图片 title（`"size=120x40"`）透传到行内占位框，
+  内联 SVG 不再因为尺寸缺失塌成 0。
+
+### 移除
+
+- **JCEF 回落整链移除**：`web/` 8 个文件、`WebFallback`、`MarkdownConfig` 的
+  `jcefDuringStreaming` / `webFallback` / `webFallbackHeight` / `cefNativeDir` / `jcefPoolSize` /
+  `webDocument` 字段、`AdapterKind.Jcef`、`docs/jcef.md`。原始 HTML 改由原生渲染接管。
+
 ### 修复
 
 - 行内构建器在 `MarkdownTokenTypes.TEXT` 上不做 `$…$` 文本扫描：

@@ -22,7 +22,7 @@ public interface BlockAdapter {
 | 成员 | 语义 | 常见错误 |
 |---|---|---|
 | `id` | 唯一标识，用于覆盖与禁用 | 和内置 id 冲突会**覆盖**内置实现 |
-| `kind` | `Native` / `Jcef` / `Fallback` | `Jcef` 会在流式期间被整体跳过 |
+| `kind` | `Native` / `Fallback` | — |
 | `priority` | 越大越优先；同值先注册者胜 | 想接管内置实现就 > 100 |
 | `formats()` | 支持的格式集合 | 每次渲染都会调用，**别在里面做重活** |
 | `isAvailable()` | 运行期探测（类是否存在、初始化是否成功） | 必须缓存结果，`select()` 每块都问一次 |
@@ -69,7 +69,7 @@ src/main/resources/META-INF/services/io.github.shinglem.markdown.adapter.BlockAd
 ### 3. 禁用内置
 
 ```kotlin
-MarkdownConfig(disabledAdapterIds = setOf("builtin.mermaid"))
+MarkdownConfig(disabledAdapterIds = setOf("builtin.diagram"))
 ```
 
 禁用按 `id` 过滤，**来源不限** —— 显式注册里同 id 的适配器也会被跳过。
@@ -134,7 +134,7 @@ override fun formats() = setOf(FormatId("chart.vega"))   // 自定义格式值
 
 `Custom.formats` 就是它的 `type` 字段，所以解析侧产出的 `type` 与适配器声明对上即可。
 解析侧要产出 `Custom` 需要换掉解析器（`GfmMarkdownParser` 是内置实现），
-目前支持的扩展路径是「用 `webDocument` 把任意块交给浏览器」或「自己解析后调用 `builtinAdapters`」——
+目前支持的扩展路径是「自己解析后调用 `builtinAdapters`」或「在 `MarkdownConfig.adapters` 里接管某个格式」——
 如果确实需要解析期扩展点，请提 issue。
 
 ## 视口（限高 + 滚动 + 缩放）
