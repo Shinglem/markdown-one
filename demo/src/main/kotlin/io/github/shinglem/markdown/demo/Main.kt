@@ -416,6 +416,404 @@ private val FIXTURES = listOf(
         $$
         """.trimIndent(),
     ),
+    Fixture(
+        "代码高亮总览",
+        """
+        # 代码高亮总览
+
+        逐个语言目视核对着色：是否有关键字/类型/函数/字符串/注释/数字的区分，
+        以及语言标签是否出现在顶栏。
+
+        ```kotlin
+        // Kotlin：关键字、类型、函数、字符串模板、注解
+        @Composable
+        fun MessageList(items: List<Message>, onTap: (Int) -> Unit) {
+            val count = items.size
+            items.forEach { item -> onTap(item.id) }
+            println("共 ${'$'}count 条")
+        }
+        ```
+
+        ```java
+        // Java：修饰符、类型、注解
+        public final class Repo implements Closeable {
+            private static final int MAX = 1024;
+
+            @Override
+            public void close() throws IOException { /* 收尾 */ }
+        }
+        ```
+
+        ```python
+        # Python：装饰器、内置常量、f-string
+        @dataclass
+        class Point:
+            x: float
+            y: float
+
+            def norm(self) -> float:
+                return (self.x ** 2 + self.y ** 2) ** 0.5
+
+        print(f"value = {1 + 2}")  # 注释
+        ```
+
+        ```javascript
+        // JavaScript：箭头函数、模板串、正则
+        const sum = (xs) => xs.reduce((a, b) => a + b, 0);
+        const re = /ab+c/gi;
+        console.log(`sum=${'$'}{sum([1, 2, 3])}`);
+        ```
+
+        ```typescript
+        // TypeScript：接口、泛型、类型别名
+        interface Box<T> {
+            value: T;
+            map<U>(f: (t: T) => U): Box<U>;
+        }
+
+        type Id = string | number;
+        ```
+
+        ```go
+        // Go：包、结构体、错误处理
+        package main
+
+        type Server struct {
+            Addr string
+            Port int
+        }
+
+        func (s *Server) Run() error {
+            if s.Port == 0 {
+                return fmt.Errorf("port is zero")
+            }
+            return nil
+        }
+        ```
+
+        ```rust
+        // Rust：生命周期、匹配、宏
+        use std::collections::HashMap;
+
+        fn main() {
+            let mut map: HashMap<&str, i32> = HashMap::new();
+            map.insert("a", 1);
+            match map.get("a") {
+                Some(v) => println!("{}", v),
+                None => println!("none"),
+            }
+        }
+        ```
+
+        ```c
+        /* C：预处理、指针、位运算 */
+        #include <stdio.h>
+
+        int main(void) {
+            unsigned mask = 0xFFu;
+            printf("%u\n", mask & 0x0F);
+            return 0;
+        }
+        ```
+
+        ```cpp
+        // C++：模板、命名空间、智能指针
+        namespace app {
+        template <typename T>
+        T clamp(T v, T lo, T hi) {
+            return v < lo ? lo : (v > hi ? hi : v);
+        }
+        }
+        ```
+
+        ```csharp
+        // C#：特性、属性、可空引用与插值串
+        [ApiController]
+        public sealed class UserController : ControllerBase
+        {
+            public string Name { get; init; } = "unknown";
+
+            [HttpGet("/u/{id:int}")]
+            public IActionResult Get(int id) => Ok($"{'$'}id");
+        }
+        ```
+
+        ```php
+        <?php
+        declare(strict_types=1);
+
+        final class Money
+        {
+            public function __construct(private int ${'$'}cents) {}
+
+            public function format(): string
+            {
+                return sprintf("%d.%02d", intdiv(${'$'}this->cents, 100), ${'$'}this->cents % 100);
+            }
+        }
+        ```
+
+        ```ruby
+        # Ruby：符号、块、实例变量
+        class Order
+          def initialize(items)
+            @items = items
+          end
+
+          def total
+            @items.sum { |i| i.price }
+          end
+        end
+        ```
+
+        ```swift
+        // Swift：可选链、计算属性、协议
+        struct Point: Equatable {
+            var x: Double
+            var y: Double
+
+            var length: Double { (x * x + y * y).squareRoot() }
+        }
+
+        let p = Point(x: 3, y: 4)
+        print(p.length)
+        ```
+
+        ```dart
+        // Dart：空安全、级联、async
+        class Repo {
+          final String base;
+          Repo(this.base);
+
+          Future<String> load(String path) async {
+            final url = '${'$'}base${'$'}path';
+            return url;
+          }
+        }
+        ```
+
+        ```sql
+        -- SQL：DDL/DML、类型、函数
+        CREATE TABLE orders (
+            id BIGSERIAL PRIMARY KEY,
+            user_id INT NOT NULL REFERENCES users (id),
+            total DECIMAL(12, 2) DEFAULT 0,
+            created_at TIMESTAMP WITH TIME ZONE
+        );
+
+        SELECT u.name, COUNT(o.id) AS cnt
+        FROM users u LEFT JOIN orders o ON o.user_id = u.id
+        WHERE o.created_at >= '2026-01-01'
+        GROUP BY u.name
+        HAVING COUNT(o.id) > 3;
+        ```
+
+        ```json
+        {
+          "name": "hermes",
+          "version": 0.42,
+          "enabled": true,
+          "tags": ["desktop", "compose"],
+          "nested": { "nullValue": null }
+        }
+        ```
+
+        ```yaml
+        # YAML：键、序列、锚点
+        service:
+          name: hermes
+          ports:
+            - 9119
+            - 8642
+          env:
+            DEBUG: true
+            RETRIES: 3
+        ```
+
+        ```toml
+        # TOML：表、数组、日期
+        [tool.hermes]
+        name = "desktop"
+        version = "0.4.1"
+        ports = [9119, 8642]
+        released = 2026-01-01T00:00:00Z
+        ```
+
+        ```html
+        <!-- HTML：标签、属性、内联样式 -->
+        <section class="card" data-id="42">
+          <h2 style="color: #333">标题</h2>
+          <p>正文 <a href="https://example.com">链接</a></p>
+        </section>
+        ```
+
+        ```css
+        /* CSS：选择器、自定义属性、单位 */
+        :root {
+          --accent: #7c4dff;
+          --radius: 12px;
+        }
+
+        .card > h2:hover {
+          color: var(--accent);
+          border-radius: var(--radius);
+        }
+        ```
+
+        ```csv
+        name,qty,price
+        apple,3,1.5
+        "banana, ripe",2,0.75
+        ```
+
+        ```graphql
+        # GraphQL：类型、查询、变量
+        type Query {
+          message(id: ID!): Message
+        }
+
+        query GetMessage(${'$'}id: ID!) {
+          message(id: ${'$'}id) { id body author { name } }
+        }
+        ```
+
+        ```bash
+        #!/usr/bin/env bash
+        set -euo pipefail
+
+        for f in "${'$'}HOME"/*.log; do
+          echo "== ${'$'}f" | tee -a report.txt
+        done
+        ```
+
+        ```powershell
+        # PowerShell：cmdlet、参数、变量
+        param([string]${'$'}Path = ".")
+
+        ${'$'}files = Get-ChildItem -Path ${'$'}Path -Filter *.log |
+            Where-Object { ${'$'}_.Length -gt 1MB }
+
+        Write-Host "共 ${'$'}(${'$'}files.Count) 个文件" -ForegroundColor Cyan
+        ```
+
+        ```dockerfile
+        # Dockerfile：指令、环境变量
+        FROM eclipse-temurin:25-jdk
+        ENV APP_HOME=/app
+        WORKDIR ${'$'}APP_HOME
+        COPY build/libs/*.jar app.jar
+        ENTRYPOINT ["java", "-jar", "app.jar"]
+        ```
+
+        ```diff
+        --- a/config.json
+        +++ b/config.json
+        @@ -1,3 +1,3 @@
+        -  "theme": "light",
+        +  "theme": "dark",
+           "zoom": 1.0
+        ```
+
+        ```markdown
+        # 标题
+
+        - 列表项 **粗体** 与 `行内码`
+        > 引用
+
+        [链接](https://example.com)
+        ```
+
+        ```ini
+        ; INI：节、键值
+        [server]
+        host = 127.0.0.1
+        port = 9119
+        ```
+
+        ```properties
+        # properties
+        app.version=0.4.1
+        app.name=hermes
+        ```
+
+        ```makefile
+        # Makefile：目标、变量、伪目标
+        VERSION := 0.4.1
+
+        .PHONY: build
+        build:
+        	./gradlew :composeApp:packageDistributable
+        ```
+
+        ```protobuf
+        // Protobuf：消息、枚举、字段号
+        syntax = "proto3";
+
+        message Request {
+          string id = 1;
+          repeated int32 values = 2;
+        }
+        ```
+
+        以下语言 **SyntaxMP 本身没有**，由本库用 `LanguageExtension` 注册（扩展优先于内置）：
+
+        ```scala
+        // Scala：扩展规则 —— 关键字 / 类型 / 注解 / 字符串落色
+        @tailrec
+        final def loop(n: Int, acc: Int): Int =
+          if (n <= 1) acc else loop(n - 1, acc * n)
+
+        case class Point(x: Int, y: Int)
+
+        object Main extends App {
+          val p = Point(1, 2)
+          println(p.x + p.y)
+        }
+        ```
+
+        ```lua
+        -- Lua：扩展规则 —— 长注释、关键字、内置函数
+        local function fib(n)
+            if n < 2 then return n end
+            return fib(n - 1) + fib(n - 2)
+        end
+
+        for i = 1, 10 do
+            print(string.format("%d", fib(i)))
+        end
+        ```
+
+        ```bat
+        REM 批处理：扩展规则
+        @echo off
+        setlocal
+        for %%f in (*.log) do echo %%f
+        endlocal
+        ```
+
+        ```vue
+        <!-- Vue：扩展规则（标记语言 + 插值） -->
+        <template>
+          <div class="app">{{ message }}</div>
+        </template>
+        ```
+
+        ```xaml
+        <!-- XAML：扩展规则（标记语言 + 绑定表达式） -->
+        <Window x:Class="App.MainWindow">
+          <TextBlock Text="{Binding Name}" />
+        </Window>
+        ```
+
+        以下语言两边都没有词法器，**保持纯文本**（用于对照，确认不误染）：
+
+        ```haskell
+        -- Haskell：预期不着色
+        fib :: Int -> Int
+        fib n = if n < 2 then n else fib (n - 1) + fib (n - 2)
+        ```
+        """.trimIndent(),
+    ),
 )
 
 /**

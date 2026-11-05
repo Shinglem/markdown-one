@@ -54,10 +54,58 @@ class CodeHighlightTest {
     }
 
     @Test
-    fun `powershell 走内置词法器`() {
+    fun `powershell 由 syntaxmp 词法器着色`() {
         val code = "\$svc = Get-Service -Name 'HermesGateway'\nif (\$null -eq \$svc) { Write-Host '未注册' }"
         val highlighted = highlightCode(code, "powershell", dark = true)
         assertTrue(highlighted.spanStyles.isNotEmpty(), "powershell 应有着色")
+    }
+
+    /** 旧方案（Highlights + 正则）完全覆盖不到的语言，接 SyntaxMP 后必须有着色。 */
+    @Test
+    fun `syntaxmp 补齐的高频语言都有着色`() {
+        val samples = mapOf(
+            "csharp" to "[ApiController]\npublic sealed class C : ControllerBase { }",
+            "graphql" to "type Query {\n  message(id: ID!): Message\n}",
+            "protobuf" to "syntax = \"proto3\";\nmessage R { string id = 1; }",
+            "makefile" to "VERSION := 0.4.1\n.PHONY: build",
+            "toml" to "[tool.hermes]\nversion = \"0.4.1\"\nports = [9119, 8642]",
+            "dockerfile" to "FROM eclipse-temurin:25-jdk\nWORKDIR /app\nCOPY . /app",
+        )
+        samples.forEach { (language, code) ->
+            assertTrue(
+                highlightCode(code, language, dark = true).spanStyles.isNotEmpty(),
+                "$language 应有着色",
+            )
+        }
+    }
+
+    /** 通过 `LanguageExtension` 注册的语言：SyntaxMP 本身没有，但我们必须能看到高亮。 */
+    @Test
+    fun `syntaxmp 扩展补齐的语言都有着色`() {
+        val samples = mapOf(
+            "bat" to "REM 说明\n@echo off\nfor %%f in (*.log) do echo %%f",
+            "scala" to "case class Point(x: Int, y: Int)\nobject Main extends App { }",
+            "lua" to "-- 注释\nlocal t = { 1, 2 }\nprint(#t)",
+            "vue" to "<template>\n  <div class=\"app\">{{ message }}</div>\n</template>",
+            "xaml" to "<Window x:Class=\"App\">\n  <TextBlock Text=\"{Binding Name}\" />\n</Window>",
+            "jsonc" to "{\n  // 注释\n  \"a\": 1\n}",
+            "cfg" to "[core]\nkey = 1",
+        )
+        samples.forEach { (language, code) ->
+            assertTrue(
+                highlightCode(code, language, dark = true).spanStyles.isNotEmpty(),
+                "$language 应有着色",
+            )
+        }
+    }
+
+    /** 两边都没有的语言必须保持纯文本，不能被别的规则误染。 */
+    @Test
+    fun `没有词法器的语言保持纯文本`() {
+        val code = "case class Point(x: Int, y: Int)"
+        assertTrue(highlightCode(code, "mermaid", dark = true).spanStyles.isEmpty())
+        assertTrue(highlightCode(code, "haskell", dark = true).spanStyles.isEmpty())
+        assertEquals(code, highlightCode(code, "haskell", dark = true).text)
     }
 
     @Test

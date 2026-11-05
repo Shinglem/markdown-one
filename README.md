@@ -87,7 +87,7 @@ MdBlock ──► AdapterRegistry
 | id | 格式 | 实现 |
 |---|---|---|
 | `builtin.markdown` | `markdown` | 自研文本块渲染器：标题 / 段落 / 引用 / 列表 / 表格 / 分割线 |
-| `builtin.code` | `code:*` | Highlights + 8 组正则补丁 |
+| `builtin.code` | `code:*` | `syntaxmp-tokenizer` + Highlights + 9 组正则补丁 |
 | `builtin.diagram` | `mermaid` / `code:*` | `io.github.huarangmeng:diagram-render`：Mermaid / PlantUML / DOT |
 | `builtin.footnotes` | `footnotes` | 脚注定义区（解析前抽出的定义，文末按序号渲染） |
 | `builtin.math` | `math` | `io.github.darriousliu:ratex`（仅 desktop） |
@@ -184,7 +184,8 @@ markdown-one/
 | 用途 | 坐标 | 版本 |
 |---|---|---|
 | GFM 解析 | `org.jetbrains:markdown` | 0.7.17 |
-| 代码高亮 | `dev.snipme:highlights` | 1.1.0 |
+| 代码高亮（主） | `com.gallatinapps.syntaxmp:syntaxmp-tokenizer` | 0.3.0 |
+| 代码高亮（兜底） | `dev.snipme:highlights` | 1.1.0 |
 | 图片 | `io.coil-kt.coil3:coil-compose` / `coil-svg` | 3.6.3 |
 | 图表（Mermaid / PlantUML / DOT） | `io.github.huarangmeng:diagram-render` | 1.0.6 |
 | HTML 解析 | `com.fleeksoft.ksoup:ksoup` | 0.2.6 |
@@ -192,6 +193,24 @@ markdown-one/
 
 文本与块的渲染（标题、段落、引用、列表、表格、分割线、行内格式）全部由本库 `text/` 包实现，
 **不依赖任何第三方 markdown renderer**。
+
+### 代码高亮的语言扩展
+
+主引擎是 `syntaxmp-tokenizer`（**只依赖 kotlin-stdlib**，不带 Compose，与 CMP 版本无关）。
+它没有的语言用 `LanguageExtension` 在 `CodeHighlight.kt` 里注册，**不改依赖源码**：
+
+| 扩展 id | 别名 | 规则 |
+|---|---|---|
+| `bat` | `bat` / `batch` / `cmd` | 行注释、标签、变量、关键字 |
+| `vue` | `vue` / `xaml` / `svg` | 标签、属性、字符串、`{{ }}` 插值与 XAML 绑定 |
+| `cfg` | `cfg` / `conf` | INI 规则 |
+| `jsonc` | `jsonc` / `json5` | JSON + `//` 注释 |
+| `scala` | `scala` | 关键字、类型、注解、字符串 |
+| `lua` | `lua` | 长注释、关键字、内置函数、库名 |
+
+加一门新语言只要写一组 `CodeRule` 再在 `SYNTAX_MP` 的 `extensions` 里加一行；
+**扩展优先于内置**，所以也能覆盖内置语言的行为。`dev.snipme:highlights` 只留
+`coffee` / `perl` 两个极低频语言兜底。
 
 版本只在 `build.gradle.kts` 顶部出现一次，改版本时同步这张表。
 `ratex` 的 native 部分由 `ratex-native-windows-x86-64` 提供（`runtimeOnly`，dll 打在 jar 里由库自己解压）。

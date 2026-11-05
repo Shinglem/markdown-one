@@ -32,6 +32,16 @@ version = "0.1.0-SNAPSHOT"
 /** 依赖版本唯一处。改版本时同步 README「依赖」表。 */
 val vIntellijMarkdown = "0.7.17"
 val vHighlights = "1.1.0"
+/**
+ * 代码高亮的词法器（`com.gallatinapps.syntaxmp`，Apache-2.0）：39 种语言的纯 Kotlin 实现，
+ * 无 JS 运行时、无正则文法。
+ *
+ * 只取 `syntaxmp-tokenizer` 模块 —— 它**只依赖 kotlin-stdlib**（不带 Compose），
+ * 所以与 CMP 版本无关，且「role → 颜色」仍由本库的调色板决定（`CodeHighlight.kt`）。
+ * `highlights` 保留作兜底：SyntaxMP 没有 bat / vue / xaml / svg / cfg / conf，
+ * 也不认识 coffee / perl，这些仍走原来的规则。
+ */
+val vSyntaxMp = "0.3.0"
 val vCoil = "3.6.3"
 /**
  * 图表引擎（io.github.huarangmeng，MIT）：Mermaid / PlantUML / DOT 一套渲染，纯 Compose。
@@ -76,6 +86,8 @@ kotlin {
             api("org.jetbrains:markdown:$vIntellijMarkdown")
 
             implementation("dev.snipme:highlights:$vHighlights")
+            // 纯词法器：[com.gallatinapps.syntaxmp.syntaxmp-tokenizer]，无 Compose 传递依赖
+            implementation("com.gallatinapps.syntaxmp:syntaxmp-tokenizer:$vSyntaxMp")
 
             implementation("io.coil-kt.coil3:coil-compose:$vCoil")
             implementation("io.coil-kt.coil3:coil-svg:$vCoil")
