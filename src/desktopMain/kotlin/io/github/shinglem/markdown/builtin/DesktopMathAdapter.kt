@@ -1,5 +1,6 @@
 package io.github.shinglem.markdown.builtin
 
+import androidx.compose.foundation.HorizontalScrollbar
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -8,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -86,12 +88,23 @@ internal class DesktopMathAdapter(private val config: MarkdownConfig) : BlockAda
         ) {
             val available = maxWidth
             val scroll = rememberScrollState()
-            Box(Modifier.fillMaxWidth().horizontalScroll(scroll)) {
-                Box(
-                    Modifier.widthIn(min = available),
-                    contentAlignment = if (math.display) Alignment.Center else Alignment.CenterStart,
-                ) {
-                    RaTeX(displayList, Modifier, fontSize)
+            // 桌面端 `horizontalScroll` 不画滚动条，而长公式的溢出部分**看不见提示**就等于没有
+            // （真机反馈：不知道能滚）。宽度只有溢出时才显示滚动条。
+            val overflow = scroll.maxValue > 0
+            Column {
+                Box(Modifier.fillMaxWidth().horizontalScroll(scroll)) {
+                    Box(
+                        Modifier.widthIn(min = available),
+                        contentAlignment = if (math.display) Alignment.Center else Alignment.CenterStart,
+                    ) {
+                        RaTeX(displayList, Modifier, fontSize)
+                    }
+                }
+                if (overflow) {
+                    HorizontalScrollbar(
+                        adapter = rememberScrollbarAdapter(scroll),
+                        modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+                    )
                 }
             }
         }

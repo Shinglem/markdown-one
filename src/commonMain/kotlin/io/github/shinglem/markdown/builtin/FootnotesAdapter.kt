@@ -46,7 +46,9 @@ internal class FootnotesAdapter(private val config: MarkdownConfig) : BlockAdapt
     @Composable
     override fun Render(block: MdBlock, modifier: Modifier) {
         val footnotes = block as MdBlock.Footnotes
-        val markdown = remember(footnotes.items) { numberedList(footnotes.items.map { it.number to it.markdown }) }
+        val markdown = remember(footnotes.items) {
+            numberedList(footnotes.items.map { Triple(it.number, it.markdown, it.id) })
+        }
         val scheme = MaterialTheme.colorScheme
         Column(modifier.fillMaxWidth().padding(top = 12.dp)) {
             Box(
@@ -67,11 +69,20 @@ internal class FootnotesAdapter(private val config: MarkdownConfig) : BlockAdapt
         }
     }
 
-    private fun numberedList(items: List<Pair<Int, String>>): String = buildString {
-        items.forEachIndexed { index, (number, body) ->
+    /**
+     * 「序号 + 定义正文 + ↩」拼成有序列表。
+     *
+     * 末尾的 `[↩](#fnref-id)` 是**回跳**：滚回正文里引用它的位置。锚点 `fnref-<id>` 由
+     * `MarkdownText` 按块原文扫出来（本适配器跑在嵌套的 `MarkdownText` 里，自己解析不到
+     * 那个锚点，靠外层的 handler 冒泡过去）。
+     */
+    private fun numberedList(items: List<Triple<Int, String, String>>): String = buildString {
+        items.forEachIndexed { index, (number, body, id) ->
             if (index > 0) append('\n')
             append(number).append(". ")
+            // 续行缩进 3 格（`1. ` 的宽度），多行定义不会被当成新段落而断号
             append(body.lines().joinToString("\n   "))
+            append(" [↩](#fnref-").append(id).append(")")
         }
     }
 }

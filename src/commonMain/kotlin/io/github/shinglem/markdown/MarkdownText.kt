@@ -104,13 +104,34 @@ public fun MarkdownText(
             anchorIdOf(block)?.let { anchor -> block.key to anchor }
         }.toMap()
     }
-    val anchorKeys: Map<String, String> = remember(anchorOf) { anchorOf.entries.associate { (key, anchor) -> anchor to key } }
+    // 脚注**回跳**锚点：`#fnref-<id>` → 引用所在块。一个块可能有多处引用，所以是「多对一」，
+    // 塞不进 anchorOf（那个是 blockKey → 单个 anchorId）。
+    val footnoteRefAnchors: Map<String, String> = remember(document.blocks) {
+        document.blocks.flatMap { block ->
+            FNREF_IN_RAW.findAll(block.raw).map { "fnref-${it.groupValues[1]}" to block.key }
+        }.toMap()
+    }
+    val anchorKeys: Map<String, String> = remember(anchorOf, footnoteRefAnchors) {
+        anchorOf.entries.associate { (key, anchor) -> anchor to key } + footnoteRefAnchors
+    }
+    // 需要注册 BringIntoViewRequester 的块：自己就是锚点的，以及被脚注回跳指向的。
+    val anchoredBlocks: Set<String> = remember(anchorOf, footnoteRefAnchors) {
+        anchorOf.keys + footnoteRefAnchors.values
+    }
     val requesters = remember(markdown) { mutableMapOf<String, BringIntoViewRequester>() }
     val anchorScope = rememberCoroutineScope()
+    // 外层文档的跳转入口：嵌套的 `MarkdownText`（列表项、引用、脚注定义里各有一份）
+    // 自己解析不到的片段要冒泡出去，否则脚注区的「↩」指向的锚点只存在于外层，点了没反应。
+    // 必须在下面的 CompositionLocalProvider 之前读，否则读到的是自己。
+    val outerAnchorScroll = LocalMdAnchorScroll.current
     val onAnchorScroll: (String) -> Unit = { fragment ->
         val target = resolveAnchorKey(fragment, anchorKeys)
         val requester = target?.let { requesters[it] }
-        if (requester != null) anchorScope.launch { runCatching { requester.bringIntoView() } }
+        if (requester != null) {
+            anchorScope.launch { runCatching { requester.bringIntoView() } }
+        } else if (target == null) {
+            outerAnchorScroll(fragment)
+        }
     }
 
     Box(
@@ -145,7 +166,6 @@ public fun MarkdownText(
                                 config.diagnostics.onRoute(block.key, block.formats, adapter.id, adapter.kind)
                             }
                             key(block.key) {
-                                val anchor = anchorOf[block.key]
                                 val blockContent: @Composable () -> Unit = {
                                     adapter.Render(
                                         block,
@@ -161,7 +181,7 @@ public fun MarkdownText(
                                         blockContent()
                                     }
                                 }
-                                if (anchor != null) {
+                                if (block.key in anchoredBlocks) {
                                     // 锚点挂在块的最外层：跳转要把整块（含视口）滚进视野
                                     val requester = remember(block.key) { BringIntoViewRequester() }
                                     SideEffect { requesters[block.key] = requester }
@@ -185,6 +205,12 @@ public fun MarkdownText(
 
 /** 脚注区的锚点 id（`#fn-xxx` 找不到精确目标时回退到它）。 */
 private const val ANCHOR_FOOTNOTES = "footnotes"
+
+/**
+ * 块原文里的脚注引用（`FootnoteNormalizer` 已经把 `[^id]` 改写成 `[n](#fn-id)`）。
+ * 用来给**回跳**（脚注定义区的「↩」）建锚点。
+ */
+private val FNREF_IN_RAW = Regex("""\(#fn-([^)\s]+)\)""")
 
 /**
  * 块 → 锚点 id。

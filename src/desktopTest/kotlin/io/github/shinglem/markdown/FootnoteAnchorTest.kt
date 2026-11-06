@@ -63,6 +63,38 @@ class FootnoteAnchorTest {
         )
     }
 
+    /**
+     * 真机那条消息的脚注引用在**列表项里**（`- TUN 模式…：**关闭**[^1]`），
+     * 列表项走的是 `MdBlocks` 的嵌套渲染路径，与段落不是同一条。
+     */
+    @Test
+    fun `列表项里的脚注引用同样是可点击链接`() = runComposeUiTest {
+        setContent {
+            MaterialTheme {
+                MarkdownText(
+                    "- 系统代理：**关闭**\n- TUN 模式：**关闭**[^1]\n\n[^1]: 两条都关就没有兜底。",
+                )
+            }
+        }
+        waitForIdle()
+        val urls = collectLinkUrls()
+        assertTrue(urls.any { it == "#fn-1" }, "列表项里的脚注没有链接，实际=$urls")
+    }
+
+    /** 脚注定义区每条末尾要有「↩」回跳链接，否则从脚注回不到正文。 */
+    @Test
+    fun `脚注定义区有回跳链接`() = runComposeUiTest {
+        setContent {
+            MaterialTheme {
+                MarkdownText("正文引用[^1]，还有第二个[^note]。\n\n[^1]: 第一条。\n[^note]: 第二条。")
+            }
+        }
+        waitForIdle()
+        val urls = collectLinkUrls()
+        assertTrue(urls.contains("#fnref-1"), "缺少 #fnref-1 回跳链接，实际=$urls")
+        assertTrue(urls.contains("#fnref-note"), "缺少 #fnref-note 回跳链接，实际=$urls")
+    }
+
     private fun androidx.compose.ui.test.ComposeUiTest.collectLinkUrls(): List<String> {
         val out = mutableListOf<String>()
         fun walk(node: SemanticsNode) {
