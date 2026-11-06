@@ -32,7 +32,9 @@ internal object MdBlockFactory {
             MarkdownElementTypes.ATX_5 -> MdBlock.Heading(key, source, rawText, node, 5)
             MarkdownElementTypes.ATX_6 -> MdBlock.Heading(key, source, rawText, node, 6)
 
-            MarkdownElementTypes.CODE_FENCE -> codeBlock(key, source, rawText, node, fenced = true)
+            MarkdownElementTypes.CODE_FENCE ->
+                mathFromFence(key, source, rawText, node)
+                    ?: codeBlock(key, source, rawText, node, fenced = true)
             MarkdownElementTypes.CODE_BLOCK -> codeBlock(key, source, rawText, node, fenced = false)
 
             MarkdownElementTypes.BLOCK_QUOTE -> MdBlock.Quote(key, source, rawText, node)
@@ -141,6 +143,24 @@ internal object MdBlockFactory {
             fenced = fenced,
             highlightLines = info.highlightLines,
         )
+    }
+
+    /**
+     * ` ```math ` 围栏 → [MdBlock.Math]。
+     *
+     * `normalizeMathBlocks` 把独占一行的 `$$ … $$` 改写成了围栏（否则块内像列表的行会把公式拆散），
+     * 这里还原回公式块。`tex` 就是围栏内的原文。
+     */
+    private fun mathFromFence(key: String, source: String, rawText: String, node: ASTNode): MdBlock.Math? {
+        val label = node.children
+            .firstOrNull { it.type == MarkdownTokenTypes.FENCE_LANG }
+            ?.let { source.substring(it.startOffset, it.endOffset).trim() }
+            ?.lowercase()
+            ?: return null
+        if (label !in MATH_FENCE_LANGUAGES) return null
+        val tex = stripFences(rawText).trim()
+        if (tex.isEmpty()) return null
+        return MdBlock.Math(key, source, rawText, node, tex = tex, display = true)
     }
 
     /** 去掉首行 ```lang 与末行 ```。 */

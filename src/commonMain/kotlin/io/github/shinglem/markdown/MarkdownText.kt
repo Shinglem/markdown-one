@@ -192,7 +192,7 @@ private const val ANCHOR_FOOTNOTES = "footnotes"
  * - 标题：GitHub 风格的 slug（`## 快速开始` → `快速开始`）；
  * - 脚注区：固定 id，供 `#fn-<id>` 回退用（逐条定位要拆脚注渲染，收益不抵复杂度）。
  */
-private fun anchorIdOf(block: MdBlock): String? = when (block) {
+internal fun anchorIdOf(block: MdBlock): String? = when (block) {
     is MdBlock.Heading -> headingAnchor(block.raw.trimStart('#').trim()).takeIf { it.isNotEmpty() }
     is MdBlock.Footnotes -> ANCHOR_FOOTNOTES
     else -> null

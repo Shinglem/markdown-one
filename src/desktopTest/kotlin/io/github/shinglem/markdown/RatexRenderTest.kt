@@ -16,6 +16,7 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.ratex.compose.rememberBlockingRaTeXDisplayList
 import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
@@ -102,6 +103,35 @@ class RatexRenderTest {
         val range = horizontalScrollRange()
         // 短公式仍可能有滚动容器（实现统一），但范围必须是 0；有范围就说明误判了宽度
         assertTrue(range == null || range.maxValue() == 0f, "短公式不该出现可滚动范围，实际=$range")
+    }
+
+    /**
+     * 真实会话里失败的形状：多行 `aligned`，行尾带可选行距参数 `\\[2pt]`，
+     * 行内还有 `\left(` / `\right)` 与 `\quad`。
+     */
+    @Test
+    fun `多行 aligned 公式带行距参数也能渲染`() = runComposeUiTest {
+        val tex = """
+            \begin{aligned}
+            \sum_{i=1}^{20}\frac{1}{i(i+1)}
+            &= \frac{1}{1\cdot 2}+\frac{1}{2\cdot 3}+\frac{1}{3\cdot 4}+\cdots+\frac{1}{20\cdot 21}\\[2pt]
+            &= \left(\frac{1}{1}-\frac{1}{2}\right)
+             + \left(\frac{1}{2}-\frac{1}{3}\right)
+             + \cdots
+             + \left(\frac{1}{20}-\frac{1}{21}\right)\\[2pt]
+            &= 1-\frac{1}{21}
+             = \frac{20}{21}
+             \approx 0.952381
+            \end{aligned}
+        """.trimIndent()
+        setContent {
+            MaterialTheme {
+                MarkdownText("$$\n$tex\n$$")
+            }
+        }
+        waitForIdle()
+        val text = renderedText()
+        assertFalse(text.contains("begin{aligned}"), "多行公式退化成源码，实际=$text")
     }
 
     private fun ComposeUiTest.horizontalScrollRange(): ScrollAxisRange? {

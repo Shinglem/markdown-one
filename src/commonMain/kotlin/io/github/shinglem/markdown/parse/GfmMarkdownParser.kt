@@ -24,7 +24,9 @@ public class GfmMarkdownParser : MarkdownParser {
         // 脚注定义与正文引用：必须在解析前抽出并改写，见 FootnoteNormalizer 的说明。
         val footnotes = preprocessFootnotes(balanced)
         // 内联 HTML → Markdown 标记：必须在解析前做，见 HtmlNormalizer 的说明。
-        val text = normalizeInlineHtml(footnotes.text)
+        // 块级 `$$…$$` → ```math 围栏：必须在解析前做，否则块内像列表的行会把公式拆散
+        // （见 MathFenceNormalizer 的说明）。
+        val text = normalizeMathBlocks(normalizeInlineHtml(footnotes.text))
         val tree = runCatching { parser.buildMarkdownTreeFromString(text as CharSequence) }.getOrNull()
             ?: return MdDocument(emptyList(), streaming)
 
